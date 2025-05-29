@@ -1,0 +1,295 @@
+---
+
+global:
+  timezone: "Europe/Zurich"
+
+## @param nameOverride String to partially override common.names.name
+##
+nameOverride: ""
+## @param fullnameOverride String to fully override common.names.fullname
+##
+fullnameOverride: ""
+
+## Invenio image version
+## ref: https://github.com/inveniosoftware/demo-inveniordm/pkgs/container/demo-inveniordm%2Fdemo-inveniordm
+## @param image.registry Invenio image registry
+## @param image.repository Invenio image repository
+## @skip image.tag Invenio image tag (immutable tags are recommended)
+## @param image.digest Invenio image digest in the way sha256:aa.... Please note this parameter, if set, will override the tag
+## @param image.pullPolicy Invenio image pull policy
+## @param image.pullSecrets Invenio image pull secrets
+image:
+  registry: apps.du.cesnet.cz
+  repository: nr-repo-docs
+  tag: "0.9.6.7"  # Defaults to .Chart.appVersion
+  digest: ""
+  ## Specify a imagePullPolicy
+  ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
+  ## ref: https://kubernetes.io/docs/concepts/containers/images/#pre-pulled-images
+  ##
+  pullPolicy: IfNotPresent
+  ## Optionally specify an array of imagePullSecrets.
+  ## Secrets must be manually created in the namespace.
+  ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+  ## e.g:
+  ## pullSecrets:
+  ##   - name: myRegistryKeySecretName
+  ##
+  pullSecrets: 
+    - name: regcred
+
+ingress:
+  enabled: false
+
+invenio:
+  configDir: /configs
+  ## @param invenio.hostname Invenio hostname (templated) used in configuration varibales like APP_ALLOWED_HOSTS, SITE_HOSTNAME or SITE_URL
+  ##
+  hostname: "vyvoj.test.cesnet.cz"
+  existing_secret: false
+  uwsgiExtraConfig: {}
+
+nginx:
+  image: "nginx:1.24.0"
+  max_conns: 100
+  assets:
+    location: /opt/invenio/var/instance/static
+  records:
+    client_max_body_size: 100m
+  files:
+    client_max_body_size: 50G
+  resources:
+    limits:
+      cpu: 250m
+      memory: 500Mi
+
+web:
+  replicas: 1
+  uwsgi:
+    processes: 1
+    threads: 2
+  readinessProbe:
+    exec:
+      command:
+        - /bin/bash
+        - -c
+        - "uwsgi_curl -X HEAD -H 'Host: {{ include \"invenio.hostname\" $ }}' 127.0.0.1:5000 /ping"
+    failureThreshold: 3
+    initialDelaySeconds: 40
+    periodSeconds: 30
+    successThreshold: 1
+    timeoutSeconds: 5
+  ## @param web.startupProbe templated `startupProbe` for the web container
+  ##
+  startupProbe:
+    exec:
+      command:
+        - /bin/bash
+        - -c
+        - "uwsgi_curl -X HEAD -H 'Host: {{ include \"invenio.hostname\" $ }}' 127.0.0.1:5000 /ping"
+    failureThreshold: 3
+    initialDelaySeconds: 20
+    periodSeconds: 20
+    successThreshold: 1
+    timeoutSeconds: 5
+  ## @param web.livenessProbe templated `livenessProbe` for the web container
+  ##
+  livenessProbe: null
+  assets:
+    location: /invenio/instance/static/
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+
+worker:
+  enabled: true
+  image: ""  # DEPRECATED: Use `.Values.image` instead!
+  imagePullSecret: ""  # DEPRECATED: Use `.Values.image.imagePullSecrets` instead!
+  app: invenio_app.celery
+  concurrency: 2
+  log_level: INFO
+  replicas: 2
+  run_mount_path: /var/run/celery
+  celery_pidfile: /var/run/celery/celerybeat.pid
+  celery_schedule: /var/run/celery/celery-schedule
+  ## @param worker.extraEnvVars Extra environment variables to be added to the pods.
+  ##
+  extraEnvVars: []
+  ## @param worker.resources `resources` for the worker container
+  ##
+  ## We have decided to unset resources by default, leaving that as a conscious choice for the user.
+  ## One reason for this is that we want it to be possible to install the chart in minimal environments like minikube.
+  ## Another reason for this choice is that it's practically impossible to know which resource requests/limits are right, since that is entirely dependent on the hardware resources available in the target cluster as well as how the application is used (ammount of traffic, number of concurrent users, size of uploaded artifacts, etc.).
+  ## Therefore, we think it's better that users get to set the resources explicitly for each container.
+  ##
+  resources: {}
+    # requests:
+    #   cpu: 500m
+    #   memory: 500Mi
+    # limits:
+    #   cpu: 1000m
+    #   memory: 1Gi
+  volumes:
+    enabled: false
+  ## @param worker.podSecurityContext securityContext for the worker Pod
+  ##
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    seccompProfile:
+      type: "RuntimeDefault"
+  ## @param worker.securityContext securityContext for the worker container
+  ##
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+  ## @param worker.extraEnvFrom Extra secretRef or configMapRef for the `envFrom` field in the worker container (templated).
+  ##
+  extraEnvFrom: []
+    # - secretRef:
+    #     name: foo
+    # - configMapRef:
+    #     name: bar
+  ## @param worker.nodeSelector Node labels for worker pods assignment
+  ## Ref: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/
+  ##
+  nodeSelector: {}
+  ## @param worker.tolerations Tolerations for worker pods assignment
+  ## Ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+  ##
+  tolerations: []
+  ## @param worker.livenessProbe templated `livenessProbe` for the worker container
+  ##
+  livenessProbe:
+    exec:
+      command:
+        - /bin/bash
+        - -c
+        - "celery -A {{ .Values.worker.app }} inspect ping -d celery@$(hostname)"
+    initialDelaySeconds: 20
+    timeoutSeconds: 30
+  ## @param worker.readinessProbe templated `readinessProbe` for the worker container
+  ##
+  readinessProbe: null
+  ## @param worker.startupProbe templated `startupProbe` for the worker container
+  ##
+  startupProbe: null
+
+workerBeat:
+  ## @param workerBeat.extraEnvVars Extra environment variables to be added to the pods.
+  ##
+  extraEnvVars: []
+  ## @param workerBeat.resources `resources` for the worker-beat container
+  ##
+  ## We have decided to unset resources by default, leaving that as a conscious choice for the user.
+  ## One reason for this is that we want it to be possible to install the chart in minimal environments like minikube.
+  ## Another reason for this choice is that it's practically impossible to know which resource requests/limits are right, since that is entirely dependent on the hardware resources available in the target cluster as well as how the application is used (ammount of traffic, number of concurrent users, size of uploaded artifacts, etc.).
+  ## Therefore, we think it's better that users get to set the resources explicitly for each container.
+  ##
+  resources: {}
+    # limits:
+    #   cpu: "2"
+    #   memory: 500Mi
+    # requests:
+    #   cpu: 500m
+    #   memory: 200Mi
+  ## @param workerBeat.securityContext securityContext for the worker-beat container
+  ##
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+  ## @param workerBeat.podSecurityContext securityContext for the worker-beat pod
+  ##
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    seccompProfile:
+      type: "RuntimeDefault"
+  ## @param workerBeat.extraEnvFrom Extra secretRef or configMapRef for the `envFrom` field in the worker-beat container (templated).
+  ##
+  extraEnvFrom: []
+    # - secretRef:
+    #     name: foo
+    # - configMapRef:
+    #     name: bar
+  ## @param workerBeat.nodeSelector Node labels for workerBeat pods assignment
+  ## Ref: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/
+  ##
+  nodeSelector: {}
+  ## @param workerBeat.tolerations Tolerations for workerBeat pods assignment
+  ## Ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+  ##
+  tolerations: []
+  ## @param workerBeat.livenessProbe templated `livenessProbe` for the worker-beat container
+  ##
+  livenessProbe:
+    exec:
+      command:
+        - /bin/bash
+        - -c
+        - "celery -A {{ .Values.worker.app }} inspect ping"
+    initialDelaySeconds: 20
+    timeoutSeconds: 30
+  ## @param workerBeat.readinessProbe templated `readinessProbe` for the worker-beat container
+  ##
+  readinessProbe: null
+  ## @param workerBeat.startupProbe templated `startupProbe` for the worker-beat container
+  ##
+  startupProbe: null
+
+persistence:
+  enabled: false
+
+redis:
+  enabled: false
+redisExternal:
+  hostname: "abcdefgh"
+
+rabbitmq:
+  enabled: false
+
+rabbitmqExternal: 
+   username: iiiiinvenio
+   password: "hhhhhh"
+   amqpPort: 5672
+   managementPort: 15672
+   hostname: "aaaaa"
+   protocol: "amqp"
+   vhost: "/"
+   existingSecret: "bbbbb"
+   existingSecretPasswordKey: "amqp-password"
+
+flower:
+  enabled: false
+
+postgresql:
+  enabled: false
+
+postgresqlExternal: 
+   configFile: true
+   existingSecret: nr-repo-docs-test-cn-pg-app
+     #uriKey: uri
+   hostnameKey: host 
+   portString: 5432
+   usernameKey: user
+   passwordKey: "password"
+   databaseKey: dbname
+#   existingSecretPasswordKey: "password"
+
+opensearch:
+  enabled: false
+
+opensearchExternal:
+  hostname: "opensearch"
+logstash:
+  enabled: false
+
+kerberos:
+  enabled: false

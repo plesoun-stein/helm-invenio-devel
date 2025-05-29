@@ -49,6 +49,10 @@ spec:
         env:
         - name: TZ
           value: {{ required "Missing .Values.global.timezone" .Values.global.timezone }}
+        {{- if .Values.invenio.configDir }}
+        - name: INVENIO_CONFIG_DIR
+          value: {{ .Values.invenio.configDir }}
+        {{- end }}
         {{- include "invenio.config.queue" . | nindent 8 }}
         {{- include "invenio.config.database" . | nindent 8 }}
         {{- with .Values.invenio.extraEnvVars }}
@@ -79,6 +83,10 @@ spec:
         readinessProbe: {{- tpl (.Values.web.readinessProbe | toYaml) $ | nindent 10 }}
         startupProbe: {{- tpl (.Values.web.startupProbe | toYaml) $ | nindent 10 }}
         volumeMounts:
+          {{- if .Values.postgresqlExternal.configFile }}
+          - name: postgresql-config
+            mountPath: /configs/postgresql
+          {{- end }}
           - name: uwsgi-config
             mountPath: '/opt/invenio/src/uwsgi'
           - name: nginx-invenio-assets
@@ -218,6 +226,9 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
       volumes:
+      {{- if .Values.postgresqlExternal.configFile }}
+      {{- include "invenio.postgresql.configFile" . | nindent 6 }}
+      {{- end }}
       {{- if .Values.logstash.enabled }}
       - name: config
         configMap:

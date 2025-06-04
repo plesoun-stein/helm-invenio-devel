@@ -45,7 +45,7 @@ invenio:
   configDir: /configs
   ## @param invenio.hostname Invenio hostname (templated) used in configuration varibales like APP_ALLOWED_HOSTS, SITE_HOSTNAME or SITE_URL
   ##
-  hostname: "vyvoj.test.cesnet.cz"
+  hostname: "vyvoj.du-k8s.du.cesnet.cz"
   existing_secret: false
   uwsgiExtraConfig: {}
 
@@ -250,21 +250,30 @@ persistence:
 redis:
   enabled: false
 redisExternal:
-  hostname: "abcdefgh"
+  hostname: "nr-repo-docs-test-redis-master"
+  password: ""
 
 rabbitmq:
   enabled: false
 
 rabbitmqExternal: 
-   username: iiiiinvenio
-   password: "hhhhhh"
-   amqpPort: 5672
-   managementPort: 15672
-   hostname: "aaaaa"
-   protocol: "amqp"
-   vhost: "/"
-   existingSecret: "bbbbb"
-   existingSecretPasswordKey: "amqp-password"
+  #  username: iiiiinvenio
+  usernameKey:
+  existingSecret: "rabbitmq-cluster-example-default-user"
+  usernameKey: "username"
+  passwordKey: "password"
+  portKey: "port"
+  amqpPort: 5672
+  managementPort: 15672
+  hostnameKey: "host"
+  vhost: ""
+  #  password: "hhhhhh"
+  #  amqpPort: 5672
+  #  managementPort: 15672
+  #  hostname: "aaaaa"
+  protocol: "amqp"
+  #  vhost: "/"
+  #  existingSecretPasswordKey: "amqp-password"
 
 flower:
   enabled: false

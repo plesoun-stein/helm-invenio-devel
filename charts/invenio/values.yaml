@@ -44,6 +44,7 @@ ingress:
   tlsSecretNameOverride: ""
 
 invenio:
+  configDir: /configs
   ## @param invenio.hostname Invenio hostname (templated) used in configuration varibales like APP_ALLOWED_HOSTS, SITE_HOSTNAME or SITE_URL
   ##
   hostname: ""
@@ -490,7 +491,7 @@ workerBeat:
   startupProbe: null
 
 persistence:
-  enabled: true
+  enabled: false
   name: "shared-volume"
   access_mode: ReadWriteMany
   annotations: {}
@@ -506,6 +507,8 @@ redis:
     disableCommands: []  # Dangerous! This lets us run the `FLUSHALL` and `FLUSHDB` commands! Unfortunately, they are required by the wipe_recreate.sh script when installing Invenio.
   replica:
     disableCommands: []  # Dangerous! This lets us run the `FLUSHALL` and `FLUSHDB` commands! Unfortunately, they are required by the wipe_recreate.sh script when installing Invenio.
+
+redisExternal: {}
 
 ## RabbitMQ chart configuration
 ## ref: https://github.com/bitnami/charts/blob/main/bitnami/rabbitmq/values.yaml
@@ -538,7 +541,7 @@ rabbitmqExternal: {}
   # existingSecretPasswordKey: "amqp-password"
 
 flower:
-  enabled: true
+  enabled: false
   image: "mher/flower:2.0"
   secret_name: "flower-secrets"
   default_username: "flower"

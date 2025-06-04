@@ -76,15 +76,121 @@ Return the proper Invenio image name
 {{- end -}}
 
 ############################     Redis Hostname     ############################
+
 {{/*
-  This template renders the hostname for the Redis instance used.
+  This template renders the name of the default secret that stores info about RabbitMQ.
+*/}}
+{{- define "invenio.redis.secretName" -}}
+  {{- if .Values.redis.enabled }}
+    {{- include "redis.secretName" .Subcharts.redis }}
+  {{- else if and (not .Values.redis.enabled) .Values.redisExternal.existingSecret }}
+    {{- required "Missing .Values.redisExternal.existingSecret" .Values.redisExternal.existingSecret }}
+  {{- else }}
+    {{- fail (printf "\n\nthere is somthing wrong with redis secret,\n\nI'm printing contexts for redis\n\ninternal config\n%v\n\nexternal config\n%v" (toYaml .Values.redis) (toYaml .Values.redisExternal)) | indent 4 }} 
+  {{- end }}
+{{- end -}}
+
+
+
+{{/*
+  This template renders the hostname for Redis.
 */}}
 {{- define "invenio.redis.hostname" -}}
   {{- if .Values.redis.enabled }}
-    {{- printf "%s-master" (include "common.names.fullname" .Subcharts.redis) }}
+{{- printf "value: %s-master" (include "common.names.fullname" .Subcharts.redis) | nindent 0 }}
+  {{- else if and (not .Values.redis.enabled) .Values.redisExternal.hostname }}
+{{- printf "value: %q" .Values.redisExternal.hostname | nindent 0 }}
   {{- else }}
-      {{- required "Missing .Values.redisExternal.hostname" .Values.redisExternal.hostname }}
-  {{- end }}
+valueFrom:
+  secretKeyRef:
+    name: {{ coalesce .Values.redisExternal.hostnameSecret (include "invenio.redis.secretName" . | trim) }}
+    key: {{ required "Missing .Values.redisExternal.hostnameKey" (tpl  .Values.redisExternal.hostnameKey .) }}
+  {{- end -}}
+{{- end -}}
+
+
+{{/*
+  This template renders the password for Redis.
+*/}}
+{{- define "invenio.redis.password" -}}
+  {{- if and .Values.redis.enabled .Values.redis.auth.enabled }}
+{{- printf "value: %s" (required "Missing .Values.redis.auth.username" (tpl .Values.redis.auth.username .)) | nindent 0 }}
+  {{- else if and (not .Values.redis.enabled) .Values.redisExternal.password }}
+{{- printf "value: %q" (.Values.redisExternal.password | toString) | nindent 0 }}
+  {{- else if and (not .Values.redis.enabled) .Values.redisExternal.passwordKey }}
+valueFrom:
+  secretKeyRef:
+    name: {{ coalesce .Values.redisExternal.passwordSecret (include "invenio.redis.secretName" . | trim) }}
+    key: {{ required "Missing .Values.redisExternal.passwordKey" (tpl  .Values.redisExternal.passwordKey .) }}
+  {{- else }}
+{{- fail (printf "\n\nthere is somthing wrong with redis password,\n\nI'm printing contexts for redis\n\ninternal config:\n%v\n\nexternal config:\n%v" (toYaml .Values.redis) (toYaml .Values.redisExternal)) | indent 4 }} 
+  {{- end -}}
+{{- end -}}
+
+{{/*
+  This template renders the protocol for accessing Redis.
+*/}}
+{{- define "invenio.redis.protocol" -}}
+  {{- if .Values.redis.enabled }}
+{{- printf "value: redis" | nindent 0 }}
+  {{- else if and (not .Values.redis.enabled) .Values.redisExternal.protocol }}
+{{- printf "value: %s" .Values.redisExternal.protocol | nindent 0 }}
+  {{- else if and (not .Values.redis.enabled) .Values.redisExternal.protocolKey }}
+valueFrom:
+  secretKeyRef:
+    name: {{ coalesce .Values.redisExternal.protocolSecret (include "invenio.redis.secretName" . | trim) }}
+    key: {{ required "Missing .Values.redisExternal.protocolKey" (tpl  .Values.redisExternal.protocolKey .) }}
+  {{- else }}  
+{{- printf "value: redis" | nindent 0 }}
+  {{- end -}}
+{{- end -}}
+
+{{/*
+  This template renders the port for accessing Redis.
+*/}}
+{{- define "invenio.redis.port" -}}
+  {{- if .Values.redis.enabled }}
+{{- printf "value: 6379" | nindent 0 }}
+  {{- else if and (not .Values.redis.enabled) .Values.redisExternal.port }}
+{{- printf "value: %q" (.Values.redisExternal.port | toString) | nindent 0 }}
+  {{- else if and (not .Values.redis.enabled) .Values.redisExternal.portKey }}
+valueFrom:
+  secretKeyRef:
+    name: {{ coalesce .Values.redisExternal.portSecret (include "invenio.redis.secretName" . | trim) }}
+    key: {{ required "Missing .Values.redisExternal.portKey" (tpl  .Values.redisExternal.portKey .) }}
+  {{- else }}  
+{{- printf "value: %q" "6379" | nindent 0 }}
+  {{- end -}}
+{{- end -}}
+
+{{/*
+  This template renders the whole config for the Redis instance used.
+*/}}
+{{- define "invenio.config.cache" -}}
+{{- $connectionString := ":$(INVENIO_CONFIG_REDIS_PASSWORD)@$(INVENIO_CONFIG_REDIS_HOST)" -}}
+{{- $connectionUrl := "$(INVENIO_CONFIG_REDIS_PROTOCOL)://:$(INVENIO_CONFIG_REDIS_PASSWORD)@$(INVENIO_CONFIG_REDIS_HOST):$(INVENIO_CONFIG_REDIS_PORT)" }}
+- name: INVENIO_CONFIG_REDIS_HOST
+  {{- (include "invenio.redis.hostname" . | trim) | nindent 2 }}
+- name: INVENIO_CONFIG_REDIS_PORT
+  {{- (include "invenio.redis.port" . | trim) | nindent 2 }}
+- name: INVENIO_CONFIG_REDIS_PROTOCOL
+  {{- (include "invenio.redis.protocol" . | trim) | nindent 2 }}
+- name: INVENIO_CONFIG_REDIS_PASSWORD
+  {{- (include "invenio.redis.password" . | trim) | nindent 2 }}
+- name: INVENIO_ACCOUNTS_SESSION_REDIS_URL
+  value: {{ printf "%s/1" $connectionUrl }}
+- name: INVENIO_CACHE_REDIS_HOST
+  value:  {{ $connectionString  }}
+- name: INVENIO_CACHE_REDIS_URL
+  value: {{ printf "%s/0" $connectionUrl }}
+- name: INVENIO_CELERY_RESULT_BACKEND
+  value: {{ printf "%s/2" $connectionUrl }}
+- name: INVENIO_IIIF_CACHE_REDIS_URL
+  value: {{ printf "%s/0" $connectionUrl }}
+- name: INVENIO_RATELIMIT_STORAGE_URI
+  value: {{ printf "%s/3" $connectionUrl }}
+- name: INVENIO_COMMUNITIES_IDENTITIES_CACHE_REDIS_URL
+  value: {{ printf "%s/4" $connectionUrl }}
 {{- end -}}
 
 #######################     Ingress TLS secret name     #######################
@@ -102,13 +208,15 @@ Return the proper Invenio image name
 
 #######################     RabbitMQ connection configuration     #######################
 {{/*
-  This template renders the name of the secret that stores the password for RabbitMQ.
+  This template renders the name of the default secret that stores info about RabbitMQ.
 */}}
-{{- define "invenio.rabbitmq.passwordSecret" -}}
+{{- define "invenio.rabbitmq.secretName" -}}
   {{- if .Values.rabbitmq.enabled }}
     {{- include "rabbitmq.secretPasswordName" .Subcharts.rabbitmq }}
+  {{- else if and (not .Values.rabbitmq.enabled) .Values.rabbitmqExternal.existingSecret }}
+    {{- required "Missing .Values.rabbitmqExternal.existingSecret" .Values.rabbitmqExternal.existingSecret }}
   {{- else }}
-      {{- required "Missing .Values.rabbitmqExternal.existingPasswordSecret" .Values.rabbitmqExternal.existingPasswordSecret }}
+    {{- fail (printf "\n\nthere is somthing wrong with rabbitmq secret,\n\nI'm printing contexts for rabbitmq\n\ninternal config\n%v\n\nexternal config\n%v" (toYaml .Values.rabbitmq) (toYaml .Values.rabbitmqExternal)) | indent 4 }} 
   {{- end }}
 {{- end -}}
 
@@ -117,7 +225,7 @@ Return the proper Invenio image name
 */}}
 {{- define "invenio.rabbitmq.username" -}}
   {{- if .Values.rabbitmq.enabled }}
-{{- printf "value: %s" required "Missing .Values.rabbitmq.auth.username" (tpl .Values.postgresql.auth.username .) | nindent 0 }}
+{{- printf "value: %s" (required "Missing .Values.rabbitmq.auth.username" (tpl .Values.rabbitmq.auth.username .)) | nindent 0 }}
   {{- else if and (not .Values.rabbitmq.enabled) .Values.rabbitmqExternal.username }}
 {{- printf "value: %s" .Values.rabbitmqExternal.username | nindent 0 }}
   {{- else }}
@@ -128,70 +236,74 @@ valueFrom:
   {{- end -}}
 {{- end -}}
 
+
+
 {{/*
   This template renders the password for accessing RabbitMQ.
 */}}
 {{- define "invenio.rabbitmq.password" -}}
   {{- if .Values.rabbitmq.enabled }}
-    {{- required "Missing .Values.rabbitmq.auth.password" .Values.rabbitmq.auth.password -}}
+{{- printf "value: %s" (required "Missing .Values.rabbitmq.auth.password" (tpl .Values.rabbitmq.auth.password .)) | nindent 0 }}
+  {{- else if and (not .Values.rabbitmq.enabled) .Values.rabbitmqExternal.password }}
+{{- printf "value: %s" .Values.rabbitmqExternal.password | nindent 0 }}
   {{- else }}
-    {{- required "Missing .Values.rabbitmqExternal.password" .Values.rabbitmqExternal.password -}}
-  {{- end }}
-{{- end -}}
-
-{{/*
-  Get the database password secret name
-*/}}
-{{- define "invenio.rabbitmq.secretName" -}}
-  {{- if .Values.rabbitmq.enabled -}}
-    {{- required "Missing .Values.rabbitmq.auth.existingPasswordSecret" (tpl .Values.rabbitmq.auth.existingPasswordSecret .) -}}
-  {{- else -}}
-    {{- required "Missing .Values.rabbitmqExternal.existingSecret" (tpl .Values.rabbitmqExternal.existingSecret .) -}}
+valueFrom:
+  secretKeyRef:
+    name: {{ coalesce .Values.rabbitmqExternal.passwordSecret (include "invenio.rabbitmq.secretName" . | trim) }}
+    key: {{ required "Missing .Values.rabbitmqExternal.passwordKey" (tpl  .Values.rabbitmqExternal.passwordKey .) }}
   {{- end -}}
 {{- end -}}
 
-{{/*
-  Get the database password secret key
-*/}}
-{{- define "invenio.rabbitmq.secretKey" -}}
-  {{- if .Values.rabbitmq.enabled -}}
-    {{- required "Missing .Values.rabbitmq.auth.existingSecretPasswordKey" .Values.rabbitmq.auth.existingSecretPasswordKey -}}
-  {{- else -}}
-    {{- required "Missing .Values.rabbitmqExternal.existingSecretPasswordKey" .Values.rabbitmqExternal.existingSecretPasswordKey -}}
-  {{- end -}}
-{{- end -}}
+
 
 {{/*
   This template renders the AMQP port number for RabbitMQ.
 */}}
 {{- define "invenio.rabbitmq.amqpPortString" -}}
   {{- if .Values.rabbitmq.enabled }}
-    {{- required "Missing .Values.rabbitmq.service.ports.amqp" .Values.rabbitmq.service.ports.amqp | quote -}}
+{{- printf "value: %q" (required "Missing .Values.rabbitmq.service.ports.amqp" (tpl (.Values.rabbitmq.service.ports.amqp | toString) .)) | nindent 0 }}
+  {{- else if and (not .Values.rabbitmq.enabled) .Values.rabbitmqExternal.amqpPort }}
+{{- printf "value: %q" (.Values.rabbitmqExternal.amqpPort | toString) | nindent 0 }}
   {{- else }}
-    {{- required "Missing .Values.rabbitmqExternal.amqpPort" (tpl (toString .Values.rabbitmqExternal.amqpPort) .) | quote -}}
-  {{- end }}
+valueFrom:
+  secretKeyRef:
+    name: {{ coalesce .Values.rabbitmqExternal.amqpPortSecret (include "invenio.rabbitmq.secretName" . | trim) }}
+    key: {{ required "Missing .Values.rabbitmqExternal.amqpPortKey" (tpl  .Values.rabbitmqExternal.amqpPortKey .) }}
+  {{- end -}}
 {{- end -}}
+
 
 {{/*
   This template renders the management port number for RabbitMQ.
 */}}
 {{- define "invenio.rabbitmq.managementPortString" -}}
   {{- if .Values.rabbitmq.enabled }}
-    {{- required "Missing .Values.rabbitmq.service.ports.manager" .Values.rabbitmq.service.ports.manager | quote -}}
+{{- printf "value: %q" (required "Missing .Values.rabbitmq.service.ports.manager" (tpl .Values.rabbitmq.service.ports.manager .)) | nindent 0 }}
+  {{- else if and (not .Values.rabbitmq.enabled) .Values.rabbitmqExternal.managementPort }}
+{{- printf "value: %q" .Values.rabbitmqExternal.managementPort | nindent 0 }}
   {{- else }}
-    {{- required "Missing .Values.rabbitmqExternal.managementPort" (tpl (toString .Values.rabbitmqExternal.managementPort) .) | quote -}}
-  {{- end }}
+valueFrom:
+  secretKeyRef:
+    name: {{ coalesce .Values.rabbitmqExternal.managementPortSecret (include "invenio.rabbitmq.secretName" . | trim) }}
+    key: {{ required "Missing .Values.rabbitmqExternal.managementPortKey" (tpl  .Values.rabbitmqExternal.managementPortKey .) }}
+  {{- end -}}
 {{- end -}}
+
 
 {{/*
   This template renders the hostname for RabbitMQ.
 */}}
 {{- define "invenio.rabbitmq.hostname" -}}
   {{- if .Values.rabbitmq.enabled }}
-    {{- include "common.names.fullname" .Subcharts.rabbitmq -}}
+{{- printf "value: %s" (include "common.names.fullname" .Subcharts.rabbitmq) | nindent 0 }}
+  {{- else if and (not .Values.rabbitmq.enabled) .Values.rabbitmqExternal.hostname }}
+{{- printf "value: %q" .Values.rabbitmqExternal.hostname | nindent 0 }}
   {{- else }}
-    {{- required "Missing .Values.rabbitmqExternal.hostname" (tpl .Values.rabbitmqExternal.hostname .) }}
-  {{- end }}
+valueFrom:
+  secretKeyRef:
+    name: {{ coalesce .Values.rabbitmqExternal.hostnameSecret (include "invenio.rabbitmq.secretName" . | trim) }}
+    key: {{ required "Missing .Values.rabbitmqExternal.hostnameKey" (tpl  .Values.rabbitmqExternal.hostnameKey .) }}
+  {{- end -}}
 {{- end -}}
 
 {{/*
@@ -199,10 +311,15 @@ valueFrom:
 */}}
 {{- define "invenio.rabbitmq.protocol" -}}
   {{- if .Values.rabbitmq.enabled }}
-    {{- "amqp" }}
+{{- printf "value: amqp" | nindent 0 }}
+  {{- else if and (not .Values.rabbitmq.enabled) .Values.rabbitmqExternal.protocol }}
+{{- printf "value: %q" .Values.rabbitmqExternal.protocol | nindent 0 }}
   {{- else }}
-    {{- required "Missing .Values.rabbitmqExternal.protocol" .Values.rabbitmqExternal.protocol }}
-  {{- end }}
+valueFrom:
+  secretKeyRef:
+    name: {{ coalesce .Values.rabbitmqExternal.protocolSecret (include "invenio.rabbitmq.secretName" . | trim) }}
+    key: {{ required "Missing .Values.rabbitmqExternal.protocolKey" (tpl  .Values.rabbitmqExternal.protocolKey .) }}
+  {{- end -}}
 {{- end -}}
 
 {{/*
@@ -210,18 +327,16 @@ valueFrom:
 */}}
 {{- define "invenio.rabbitmq.vhost" -}}
   {{- if .Values.rabbitmq.enabled }}
-    {{- "" }}
+{{- printf "value: %q" "" | nindent 0 }}
+  {{- else if and (not .Values.rabbitmq.enabled) (hasKey .Values.rabbitmqExternal "vhost") }}
+{{- printf "value: %q" .Values.rabbitmqExternal.vhost | nindent 0 }}
   {{- else }}
-    {{- required "Missing .Values.rabbitmqExternal.vhost" (tpl .Values.rabbitmqExternal.vhost .) }}
-  {{- end }}
+valueFrom:
+  secretKeyRef:
+    name: {{ coalesce .Values.rabbitmqExternal.vhostSecret (include "invenio.rabbitmq.secretName" . | trim) }}
+    key: {{ required "Missing .Values.rabbitmqExternal.vhostKey" (tpl  .Values.rabbitmqExternal.vhostKey .) }}
+  {{- end -}}
 {{- end -}}
-
-
-
-
-
-
-
 
 
 {{/*
@@ -232,22 +347,15 @@ valueFrom:
 - name: INVENIO_AMQP_BROKER_USER
   {{- (include "invenio.rabbitmq.username" . | trim) | nindent 2 }}
 - name: INVENIO_AMQP_BROKER_HOST
-  value: {{ include "invenio.rabbitmq.hostname" . }}
+  {{- (include "invenio.rabbitmq.hostname" . | trim) | nindent 2 }}
 - name: INVENIO_AMQP_BROKER_PORT
-  value: {{ include "invenio.rabbitmq.amqpPortString" . }}
+  {{- (include "invenio.rabbitmq.amqpPortString" . | trim) | nindent 2 }}
 - name: INVENIO_AMQP_BROKER_VHOST
-  value: {{ include "invenio.rabbitmq.vhost" . }}
+  {{- (include "invenio.rabbitmq.vhost" . | trim) | nindent 2 }}
 - name: INVENIO_AMQP_BROKER_PROTOCOL
-  value: {{ include "invenio.rabbitmq.protocol" . }}
+  {{- (include "invenio.rabbitmq.protocol" . | trim) | nindent 2 }}
 - name: INVENIO_AMQP_BROKER_PASSWORD
-{{- if or (and .Values.rabbitmq.enabled .Values.rabbitmq.auth.password) .Values.rabbitmqExternal.password }}
-  value: {{ include "invenio.rabbitmq.password" .  | quote }}
-{{- else }}
-  valueFrom:
-    secretKeyRef:
-      name: {{ include "invenio.rabbitmq.secretName" .}}
-      key: {{ include "invenio.rabbitmq.secretKey" .}}
-{{- end }}
+  {{- (include "invenio.rabbitmq.password" . | trim) | nindent 2 }}
 - name: INVENIO_BROKER_URL
   value: {{ $uri }}
 - name: INVENIO_CELERY_BROKER_URL
@@ -271,7 +379,7 @@ valueFrom:
 #########################     PostgreSQL connection configuration     #########################
 
 {{/*
-  Get the database password secret name
+  Get the database cluster config secret name
 */}}
 {{- define "invenio.postgresql.secretName" -}}
   {{- if .Values.postgresql.enabled -}}
@@ -286,7 +394,7 @@ valueFrom:
 */}}
 {{- define "invenio.postgresql.username" -}}
   {{- if .Values.postgresql.enabled -}}
-{{- printf "value: %s" required "Missing .Values.postgresql.auth.username" (tpl .Values.postgresql.auth.username .) | nindent 0 }}
+{{- printf "value: %s" (required "Missing .Values.postgresql.auth.username" (tpl .Values.postgresql.auth.username .)) | nindent 0 }}
   {{- else if and (not .Values.postgresql.enabled) .Values.postgresqlExternal.username }}
 {{- printf "value: %s" .Values.postgresqlExternal.username | nindent 0 }}
   {{- else }}
@@ -321,7 +429,7 @@ valueFrom:
 
 {{- define "invenio.postgresql.password" -}}
   {{- if .Values.postgresql.enabled -}}
-{{- printf "value: %s" required "Missing .Values.postgresql.auth.password" .Values.postgresql.auth.password | nindent 0 -}}
+{{- printf "value: %s" (required "Missing .Values.postgresql.auth.password" .Values.postgresql.auth.password) | nindent 0 -}}
   {{- else if and (not .Values.postgresql.enabled) .Values.postgresqlExternal.password }}
 {{- printf "value: %s" .Values.postgresqlExternal.password | nindent 0 }}
   {{- else }}
@@ -337,7 +445,7 @@ valueFrom:
 */}}
 {{- define "invenio.postgresql.portString" -}}
   {{- if .Values.postgresql.enabled -}}
-{{- printf "value: %q" required "Missing .Values.postgresql.primary.service.ports.postgresql" (tpl (toString .Values.postgresql.primary.service.ports.postgresql) .) | quote | nindent 0 -}}
+{{- printf "value: %q" (required "Missing .Values.postgresql.primary.service.ports.postgresql" (tpl (toString .Values.postgresql.primary.service.ports.postgresql) .)) | nindent 0 -}}
   {{- else if and (not .Values.postgresql.enabled) .Values.postgresqlExternal.portString }}
 {{- printf "value: %q" (.Values.postgresqlExternal.portString | toString) | nindent 0 }}
   {{- else }}
@@ -353,7 +461,7 @@ valueFrom:
 */}}
 {{- define "invenio.postgresql.database" -}}
   {{- if .Values.postgresql.enabled -}}
-{{- printf "value: %s" required "Missing .Values.postgresql.auth.database" (tpl .Values.postgresql.auth.database .) | nindent 0 }}
+{{- printf "value: %s" (required "Missing .Values.postgresql.auth.database" (tpl .Values.postgresql.auth.database .)) | nindent 0 }}
   {{- else if and (not .Values.postgresql.enabled) .Values.postgresqlExternal.database }}
 {{- printf "value: %s" .Values.postgresqlExternal.database | nindent 0 }}
   {{- else }}
@@ -441,15 +549,15 @@ valueFrom:
         - key: {{ $item }}
           path: {{ $value }}
       {{- else }}
-      {{- $keyName := (printf "%sKey" $item) }}
-      {{- $secretName := (printf "%sSecret" $item) }}
+        {{- $keyName := (printf "%sKey" $item) }}
+        {{- $secretName := (printf "%sSecret" $item) }}
         name: {{ coalesce (get $root.Values.postgresqlExternal $secretName) (include "invenio.postgresql.secretName" $root | trim) }}
         items: 
         - key: {{ get $root.Values.postgresqlExternal $keyName }}
           path: {{ $value | toString }}
       {{- end }}
       {{- end }}
-      {{- end }}
+    {{- end }}
 {{- end }}
 
 

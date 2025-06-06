@@ -364,6 +364,60 @@ valueFrom:
   value: "http://$(INVENIO_AMQP_BROKER_USER):$(INVENIO_AMQP_BROKER_PASSWORD)@$(INVENIO_AMQP_BROKER_HOST):$(INVENIO_AMQP_BROKER_PORT)/api/"
 {{- end -}}
 
+{{/*
+  Define a projected volume for PostgreSQL config file.
+
+  Usage:
+    {{ include "invenio.rabbitmq.configFile" . | nindent 6 }}
+
+  Expected context:
+    .Values.rabbitmqExternal.*
+*/}}
+
+{{- define "invenio.rabbitmq.configFile" -}}
+{{- $fields := dict "username" "password" "hostname" "portString" "vhost" "protocol" }}
+{{- $parts := dict }}
+
+{{- $root := . }}
+- name: rabbitmq-config
+  projected:
+    sources:
+    {{- if or .Values.rabbitmqExternal.uri }}
+    - secret:
+        name: invenio-rabbitmq-inline
+	items:
+	- key: uri
+	  path: INVENIO_SQLALCHEMY_DATABASE_URI
+    {{- else if .Values.rabbitmqExternal.uriKey }}
+    - secret:
+        name: {{ coalesce .Values.rabbitmqExternal.uriSecret (include "invenio.rabbitmq.secretName" $root | trim) }} 
+        items:
+        - key: {{ .Values.rabbitmqExternal.uriKey }} 
+          path: INVENIO_SQLALCHEMY_DATABASE_URI
+    {{- else }}
+    {{- range $item, $value := $fields }}
+    - secret:
+      {{- if hasKey $root.Values.rabbitmqExternal $item }}
+        name: invenio-rabbitmq-inline
+        items:
+        - key: {{ $item }}
+          path: {{ $value }}
+      {{- else }}
+        {{- $keyName := (printf "%sKey" $item) }}
+        {{- $secretName := (printf "%sSecret" $item) }}
+        name: {{ coalesce (get $root.Values.rabbitmqExternal $secretName) (include "invenio.rabbitmq.secretName" $root | trim) }}
+        items: 
+        - key: {{ get $root.Values.rabbitmqExternal $keyName }}
+          path: {{ $value | toString }}
+      {{- end }}
+      {{- end }}
+    {{- end }}
+{{- end }}
+
+
+
+
+
 #########################     OpenSearch hostname     #########################
 {{/*
   This template renders the hostname of the OpenSearch instance.
@@ -591,15 +645,8 @@ Add sentry environmental variables
 Invenio basic configuration variables
 */}}
 {{- define "invenio.configBase" -}}
-INVENIO_ACCOUNTS_SESSION_REDIS_URL: 'redis://{{ include "invenio.redis.hostname" . }}:6379/1'
 INVENIO_APP_ALLOWED_HOSTS: '["{{ include "invenio.hostname" $ }}"]'
 INVENIO_TRUSTED_HOSTS: '["{{ include "invenio.hostname" $ }}"]'
-INVENIO_CACHE_REDIS_HOST: '{{ include "invenio.redis.hostname" . }}'
-INVENIO_CACHE_REDIS_URL: 'redis://{{ include "invenio.redis.hostname" . }}:6379/0'
-INVENIO_CELERY_RESULT_BACKEND: 'redis://{{ include "invenio.redis.hostname" . }}:6379/2'
-INVENIO_IIIF_CACHE_REDIS_URL: 'redis://{{ include "invenio.redis.hostname" . }}:6379/0'
-INVENIO_RATELIMIT_STORAGE_URI: 'redis://{{ include "invenio.redis.hostname" . }}:6379/3'
-INVENIO_COMMUNITIES_IDENTITIES_CACHE_REDIS_URL: 'redis://{{ include "invenio.redis.hostname" . }}:6379/4'
 INVENIO_SEARCH_HOSTS: {{ printf "[{'host': '%s'}]" (include "invenio.opensearch.hostname" .) | quote }}
 INVENIO_SITE_HOSTNAME: '{{ include "invenio.hostname" $ }}'
 INVENIO_SITE_UI_URL: 'https://{{ include "invenio.hostname" $ }}'

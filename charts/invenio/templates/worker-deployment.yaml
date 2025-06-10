@@ -52,8 +52,19 @@ spec:
           env:
           - name: TZ
             value: {{ required "Missing .Values.global.timezone" .Values.global.timezone }}
-          {{- include "invenio.config.queue" . | nindent 10 }}
-          {{- include "invenio.config.database" . | nindent 10 }}
+          {{- if .Values.invenio.configDir }}
+          - name: INVENIO_CONFIG_DIR
+            value: {{ .Values.invenio.configDir }}
+          {{- end }}
+          {{- if not .Values.rabbitmqExternal.configFile }}
+          {{- include "invenio.config.queue" . | nindent 8 }}
+          {{- end }}
+          {{- if not .Values.postgresqlExternal.configFile }}
+          {{- include "invenio.config.database" . | nindent 8 }}
+          {{- end }}
+          {{- if not .Values.redisExternal.configFile }}
+          {{- include "invenio.config.cache" . | nindent 8 }}
+          {{- end }}
           {{- with .Values.invenio.extraEnvVars }}
           {{- toYaml . | nindent 10 }}
           {{- end }}
@@ -82,6 +93,10 @@ spec:
           readinessProbe: {{- tpl (.Values.worker.readinessProbe | toYaml) $ | nindent 12 }}
           startupProbe: {{- tpl (.Values.worker.startupProbe | toYaml) $ | nindent 12 }}
           volumeMounts:
+            - name: copy-configdata
+              mountPath: /mounted/scripts
+            - name: config-files
+              mountPath: /configs
             {{- if .Values.persistence.enabled }}
             - mountPath: /opt/invenio/var/instance/data
               name: shared-volume
@@ -115,8 +130,43 @@ spec:
               mountPath: /tmp
         {{- end }}
 
-      {{- if .Values.kerberos.enabled }}
       initContainers:
+        # copy configfiles
+        - name: copy-configfiles
+          image: {{ default .Values.web.image (include "invenio.image" .) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy | quote }}
+          command: [
+              "/bin/bash",
+              "/mounted/scripts/copy.sh"
+          ]
+          resources: {{- toYaml .Values.web.initContainers.resources | nindent 12 }}
+          securityContext:
+            {{- with .Values.worker.securityContext }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          volumeMounts:
+          - name: copy-configdata
+            mountPath: /mounted/scripts
+          - name: config-files
+            mountPath: /configs
+          {{- if .Values.postgresqlExternal.configFile }}
+          - name: postgresql-config
+            mountPath: /mounted/postgresql
+          {{- end }}
+          {{- if .Values.rabbitmqExternal.configFile }}
+          - name: rabbitmq-config
+            mountPath: /mounted/rabbitmq
+          {{- end }}
+          {{- if .Values.redisExternal.configFile }}
+          - name: redis-config
+            mountPath: /mounted/redis
+          {{- end }}
+          {{- if .Values.invenio.extraConfigFiles }}
+          - name: extra-configfiles
+            mountPath: /mounted/extra
+          {{- end }}
+
+      {{- if .Values.kerberos.enabled }}
         # Init kerberos credentials
         - name: init-kerberos-credentials
           image: {{ required "Missing .Values.kerberos.image" .Values.kerberos.image }}
@@ -134,6 +184,29 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
       volumes:
+        - name: config-files
+          emptyDir: {}
+        - name: copy-configdata
+          projected:
+            sources:
+              - secret:
+                  name: {{ include "invenio.fullname" . }}-copy-configfiles
+                  items:
+                  - key: copy.sh
+                    path: copy.sh
+        {{- if .Values.invenio.extraConfigFiles }}
+        {{- include "invenio.extraConfigFiles" . | nindent 8 }}
+        {{- end }}
+        {{- if .Values.postgresqlExternal.configFile }}
+        {{- include "invenio.postgresql.configFile" . | nindent 8 }}
+        {{- end }}
+        {{- if .Values.rabbitmqExternal.configFile }}
+        {{- include "invenio.rabbitmq.configFile" . | nindent 8 }}
+        {{- end }}
+        {{- if .Values.redisExternal.configFile }}
+        {{- include "invenio.redis.configFile" . | nindent 8 }}
+        {{- end }}
+
         {{- if .Values.persistence.enabled }}
         - name: shared-volume
           persistentVolumeClaim:

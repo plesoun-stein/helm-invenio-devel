@@ -48,6 +48,19 @@ invenio:
   hostname: "vyvoj.du-k8s.du.cesnet.cz"
   existing_secret: false
   uwsgiExtraConfig: {}
+  extraConfigFiles:
+    - bbb-prepsec-secrets-invenio-datacitecfg
+    - bbb-prepsec-secrets-invenio-glitchtip
+    - bbb-prepsec-secrets-invenio-mail
+    - bbb-prepsec-secrets-invenio-s3
+    - copyconfig-secrets-invenio-mail
+  extraEnvFrom:
+    - secretRef:
+        name: bbb-prepsec-secrets-invenio-config-path 
+    # - configMapRef:
+    #     name: bar
+
+
 
 nginx:
   image: "nginx:1.24.0"
@@ -250,23 +263,26 @@ persistence:
 redis:
   enabled: false
 redisExternal:
+  configFile: true
+  existingSecret: nr-repo-docs-test-invenio-backend-services-redis 
   hostname: "nr-repo-docs-test-redis-master"
-  password: ""
-
+  passwordKey: "redisPassword"
+  port: "6379"
+  protocol: redis
 rabbitmq:
   enabled: false
 
 rabbitmqExternal: 
+  configFile: true
   #  username: iiiiinvenio
-  usernameKey:
   existingSecret: "rabbitmq-cluster-example-default-user"
   usernameKey: "username"
   passwordKey: "password"
-  portKey: "port"
+    #portKey: "port"
   amqpPort: 5672
   managementPort: 15672
   hostnameKey: "host"
-  vhost: ""
+  vhost: "/"
   #  password: "hhhhhh"
   #  amqpPort: 5672
   #  managementPort: 15672
@@ -284,19 +300,18 @@ postgresql:
 postgresqlExternal: 
    configFile: true
    existingSecret: nr-repo-docs-test-cn-pg-app
-     #uriKey: uri
+   uriKey: uri
    hostnameKey: host 
    portString: 5432
    usernameKey: user
    passwordKey: "password"
    databaseKey: dbname
-#   existingSecretPasswordKey: "password"
 
 opensearch:
   enabled: false
 
 opensearchExternal:
-  hostname: "opensearch"
+  hostname: "opensearch-cluster-master"
 logstash:
   enabled: false
 

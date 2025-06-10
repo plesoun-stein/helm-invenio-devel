@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: Secret
+type: Opaque
+metadata:
+  name: {{ include "invenio.fullname" . }}-copy-configfiles
+  labels:
+    {{- include "invenio.labels" . | nindent 4 }}
+    app: {{ .Values.invenio.remote_apps.secret_name }}
+  annotations:
+    helm.sh/resource-policy: keep
+stringData:
+  copy.sh: |-
+    # postgresql
+    if [ -f /mounted/postgresql/INVENIO_SQLALCHEMY_DATABASE_URI ]; then 
+      echo "INVENIO_SQLALCHEMY_DATABASE_URI: $(cat /mounted/postgresql/INVENIO_SQLALCHEMY_DATABASE_URI)" > /configs/INVENIO_SQLALCHEMY_DATABASE_URI.yaml
+    fi  
+    # rabbitmq
+    MY_HOST=$(cat /mounted/rabbitmq/INVENIO_AMQP_BROKER_HOST)
+    MY_PASSWORD=$(cat /mounted/rabbitmq/INVENIO_AMQP_BROKER_PASSWORD)
+    MY_PORT=$(cat /mounted/rabbitmq/INVENIO_AMQP_BROKER_PORT)
+    MY_PROTOCOL=$(cat /mounted/rabbitmq/INVENIO_AMQP_BROKER_PROTOCOL)
+    MY_USER=$(cat /mounted/rabbitmq/INVENIO_AMQP_BROKER_USER)
+    MY_VHOST=$(cat /mounted/rabbitmq/INVENIO_AMQP_BROKER_VHOST)
+    echo "INVENIO_BROKER_URL: ${MY_PROTOCOL}://${MY_USER}:${MY_PASSWORD}@${MY_HOST}:$MY_PORT/${MY_VHOST}" >> /configs/rabbitmq.yaml 
+    echo "INVENIO_CELERY_BROKER_URL: ${MY_PROTOCOL}://${MY_USER}:${MY_PASSWORD}@${MY_HOST}:$MY_PORT/${MY_VHOST}" >> /configs/rabbitmq.yaml 
+    # redis
+    MY_HOST=$(cat /mounted/redis/INVENIO_CONFIG_REDIS_HOST)
+    MY_PASSWORD=$(cat /mounted/redis/INVENIO_CONFIG_REDIS_PASSWORD)
+    MY_PORT=$(cat /mounted/redis/INVENIO_CONFIG_REDIS_PORT)
+    MY_PROTOCOL=$(cat /mounted/redis/INVENIO_CONFIG_REDIS_PROTOCOL)
+    echo "INVENIO_CACHE_REDIS_HOST: :${MY_PASSWORD}@${MY_HOST}" >> /configs/redis.yaml
+    echo "INVENIO_ACCOUNTS_SESSION_REDIS_URL: ${MY_PROTOCOL}://:${MY_PASSWORD}@${MY_HOST}:$MY_PORT/1" >> /configs/redis.yaml
+    echo "INVENIO_CACHE_REDIS_URL: ${MY_PROTOCOL}://:${MY_PASSWORD}@${MY_HOST}:$MY_PORT/0" >> /configs/redis.yaml
+    echo "INVENIO_CELERY_RESULT_BACKEND: ${MY_PROTOCOL}://:${MY_PASSWORD}@${MY_HOST}:$MY_PORT/2" >> /configs/redis.yaml
+    echo "INVENIO_COMMUNITIES_IDENTITIES_CACHE_REDIS_URL: ${MY_PROTOCOL}://:${MY_PASSWORD}@${MY_HOST}:$MY_PORT/4" >> /configs/redis.yaml
+    echo "INVENIO_IIIF_CACHE_REDIS_URL: ${MY_PROTOCOL}://:${MY_PASSWORD}@${MY_HOST}:$MY_PORT/0" >> /configs/redis.yaml
+    echo "INVENIO_RATELIMIT_STORAGE_URI: ${MY_PROTOCOL}://:${MY_PASSWORD}@${MY_HOST}:$MY_PORT/3" >> /configs/redis.yaml
+    
+    # copy extraconfig
+    if [ -d /mounted/extra ] ; then
+    find /mounted/extra/ -maxdepth 1  -name "*.yaml" -exec cp {} /configs \;
+    fi
+    # cp /mounted/uwsgi-config/uwsgi.ini /configs/
+    # echo "some other stuff"
+

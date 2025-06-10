@@ -38,6 +38,8 @@ spec:
           {{- toYaml . | nindent 10 }}
           {{- end }}
         volumeMounts:
+        - name: config-files
+          mountPath: /configs
         - name: var-run-celery
           mountPath: {{ .Values.worker.run_mount_path }}
         {{- if .Values.persistence.enabled }}
@@ -60,11 +62,23 @@ spec:
         {{- with .Values.workerBeat.extraEnvFrom }}
         {{- tpl (. | toYaml) $ | nindent 8 }}
         {{- end }}
-        env:
-        - name: TZ
-          value: {{ required "Missing .Values.global.timezone" .Values.global.timezone }}
+        env: 
+        - name: TZ 
+          value: {{ required "Missing .Values.global.timezone" .Values.global.timezone }} 
+        {{- if .Values.invenio.configDir }} 
+        - name: INVENIO_CONFIG_DIR 
+          value: {{ .Values.invenio.configDir }} 
+        {{- end }}
+        {{- if not .Values.rabbitmqExternal.configFile }}
         {{- include "invenio.config.queue" . | nindent 8 }}
-        {{- include "invenio.config.database" . | nindent 8}}
+        {{- end }}
+        {{- if not .Values.postgresqlExternal.configFile }}
+        {{- include "invenio.config.database" . | nindent 8 }}
+        {{- end }}
+        {{- if not .Values.redisExternal.configFile }}
+        {{- include "invenio.config.cache" . | nindent 8 }}
+        {{- end }}
+
         {{- with .Values.invenio.extraEnvVars }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -84,11 +98,69 @@ spec:
         readinessProbe: {{- tpl (.Values.workerBeat.readinessProbe | toYaml) $ | nindent 10 }}
         startupProbe: {{- tpl (.Values.workerBeat.startupProbe | toYaml) $ | nindent 10 }}
         resources: {{- toYaml .Values.workerBeat.resources | nindent 10 }}
+      initContainers:
+      # copy configfiles
+        - name: copy-configfiles
+          image: {{ default .Values.web.image (include "invenio.image" .) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy | quote }}
+          command: [
+              "/bin/bash",
+              "/mounted/scripts/copy.sh"
+          ]
+          resources: {{- toYaml .Values.web.initContainers.resources | nindent 12 }}
+          securityContext:
+            {{- with .Values.web.initContainers.securityContext }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          volumeMounts:
+          - name: copy-configdata
+            mountPath: /mounted/scripts
+          - name: config-files
+            mountPath: /configs
+          {{- if .Values.postgresqlExternal.configFile }}
+          - name: postgresql-config
+            mountPath: /mounted/postgresql
+          {{- end }}
+          {{- if .Values.rabbitmqExternal.configFile }}
+          - name: rabbitmq-config
+            mountPath: /mounted/rabbitmq
+          {{- end }}
+          {{- if .Values.redisExternal.configFile }}
+          - name: redis-config
+            mountPath: /mounted/redis
+          {{- end }}
+          {{- if .Values.invenio.extraConfigFiles }}
+          - name: extra-configfiles
+            mountPath: /mounted/extra
+          {{- end }}
       securityContext:
         {{- with .Values.workerBeat.podSecurityContext }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
       volumes:
+      - name: config-files
+        emptyDir: {}
+      - name: copy-configdata
+        projected:
+          sources:
+            - secret:
+                name: {{ include "invenio.fullname" . }}-copy-configfiles
+                items:
+                - key: copy.sh
+                  path: copy.sh
+      {{- if .Values.invenio.extraConfigFiles }}
+      {{- include "invenio.extraConfigFiles" . | nindent 6 }}
+      {{- end }}
+      {{- if .Values.postgresqlExternal.configFile }}
+      {{- include "invenio.postgresql.configFile" . | nindent 6 }}
+      {{- end }}
+      {{- if .Values.rabbitmqExternal.configFile }}
+      {{- include "invenio.rabbitmq.configFile" . | nindent 6 }}
+      {{- end }}
+      {{- if .Values.redisExternal.configFile }}
+      {{- include "invenio.redis.configFile" . | nindent 6 }}
+      {{- end }}
+
       - name: var-run-celery
         emptyDir:
           medium: Memory

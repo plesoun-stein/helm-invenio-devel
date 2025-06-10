@@ -75,6 +75,23 @@ Return the proper Invenio image name
   {{- tpl (required "Missing .Values.invenio.hostname" .Values.invenio.hostname) . }}
 {{- end -}}
 
+###########################     Invenio hostname     ###########################
+
+{{- define "invenio.extraConfigFiles" -}}
+{{- $root := . }}
+- name: extra-configfiles
+  projected:
+    sources:
+    {{- range $secret := $root.Values.invenio.extraConfigFiles }}
+    - secret:
+        name: {{ $secret }}
+    {{- end }}
+{{- end }}
+
+
+
+
+
 ############################     Redis Hostname     ############################
 
 {{/*
@@ -86,11 +103,9 @@ Return the proper Invenio image name
   {{- else if and (not .Values.redis.enabled) .Values.redisExternal.existingSecret }}
     {{- required "Missing .Values.redisExternal.existingSecret" .Values.redisExternal.existingSecret }}
   {{- else }}
-    {{- fail (printf "\n\nthere is somthing wrong with redis secret,\n\nI'm printing contexts for redis\n\ninternal config\n%v\n\nexternal config\n%v" (toYaml .Values.redis) (toYaml .Values.redisExternal)) | indent 4 }} 
+    {{- fail (printf "\n\nInternal redis is disabled\n\nexternalRedis is missing existingSecret key,\n\nI'm printing contexts \n\n\nredis:\n%v\n\n\nexternalRedis:\n%v" (toYaml .Values.redis | indent 2) (toYaml .Values.redisExternal | indent 2)) | indent 4 }} 
   {{- end }}
 {{- end -}}
-
-
 
 {{/*
   This template renders the hostname for Redis.
@@ -108,7 +123,6 @@ valueFrom:
   {{- end -}}
 {{- end -}}
 
-
 {{/*
   This template renders the password for Redis.
 */}}
@@ -123,7 +137,7 @@ valueFrom:
     name: {{ coalesce .Values.redisExternal.passwordSecret (include "invenio.redis.secretName" . | trim) }}
     key: {{ required "Missing .Values.redisExternal.passwordKey" (tpl  .Values.redisExternal.passwordKey .) }}
   {{- else }}
-{{- fail (printf "\n\nthere is somthing wrong with redis password,\n\nI'm printing contexts for redis\n\ninternal config:\n%v\n\nexternal config:\n%v" (toYaml .Values.redis) (toYaml .Values.redisExternal)) | indent 4 }} 
+{{/* - fail (printf "\n\nthere is somthing wrong with redis password,\n\nI'm printing contexts for redis\n\ninternal config:\n%v\n\nexternal config:\n%v" (toYaml .Values.redis) (toYaml .Values.redisExternal)) | indent 4 */}} 
   {{- end -}}
 {{- end -}}
 
@@ -192,6 +206,54 @@ valueFrom:
 - name: INVENIO_COMMUNITIES_IDENTITIES_CACHE_REDIS_URL
   value: {{ printf "%s/4" $connectionUrl }}
 {{- end -}}
+
+{{- define "invenio.redis.configFile" -}}
+{{- $fields := dict "password" "INVENIO_CONFIG_REDIS_PASSWORD" "hostname" "INVENIO_CONFIG_REDIS_HOST" "port" "INVENIO_CONFIG_REDIS_PORT" "protocol" "INVENIO_CONFIG_REDIS_PROTOCOL" }}
+{{- $root := . }}
+- name: redis-config
+  projected:
+    sources:
+  {{- if .Values.redisExternal.uri }}
+    - secret:
+        name: {{ include "invenio.fullname" $root }}-invenio-redis-inline
+	items:
+	- key: uri
+	  path: INVENIO_BROKER_URL
+	- key: uri
+	  path: INVENIO_CELERY_BROKER_URL
+  {{- else if .Values.redisExternal.uriKey }}
+    - secret:
+        name: {{ coalesce .Values.redisExternal.uriSecret (include "invenio.redis.secretName" $root | trim) }} 
+        items:
+        - key: {{ .Values.redisExternal.uriKey }} 
+          path: INVENIO_BROKER_URL
+        - key: {{ .Values.redisExternal.uriKey }} 
+          path: INVENIO_CELERY_BROKER_URL
+  {{- else }}
+    {{- range $item, $value := $fields }}
+    - secret:
+      {{- if hasKey $root.Values.redisExternal $item }}
+        name: {{ include "invenio.fullname" $root }}-invenio-redis-inline
+        items:
+        - key: {{ $item }}
+          path: {{ $value }}
+      {{- else }}
+        {{- $keyName := (printf "%sKey" $item) }}
+        {{- $secretName := (printf "%sSecret" $item) }}
+        name: {{ coalesce (get $root.Values.redisExternal $secretName) (include "invenio.redis.secretName" $root | trim) }}
+        items: 
+        - key: {{ get $root.Values.redisExternal $keyName }}
+          path: {{ $value | toString }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+
+
+
+
+
+
 
 #######################     Ingress TLS secret name     #######################
 {{/*
@@ -338,11 +400,25 @@ valueFrom:
   {{- end -}}
 {{- end -}}
 
+{{/*
+  This template renders the whole URI into one string for RabbitMQ.
+*/}}
+{{- define "invenio.rabbitmq.uri" -}}
+  {{- if and (not .Values.rabbitmq.enabled) .Values.rabbitmqExternal.uri }}
+{{- printf "value: %s" .Values.rabbitmqExternal.uri | nindent 0 }}
+  {{- else if and (not .Values.rabbitmq.enabled) .Values.rabbitmqExternal.uriKey }}
+valueFrom:
+  secretKeyRef:
+    name: {{ coalesce .Values.rabbitmqExternal.uriSecret (include "invenio.rabbitmq.secretName" . | trim) }}
+    key: {{ required "Missing .Values.rabbitmqExternal.uriKey" (tpl  .Values.rabbitmqExternal.uriKey .) }}
+  {{- end -}}
+{{- end -}}
 
 {{/*
   RabbitMQ connection env section.
 */}}
 {{- define "invenio.config.queue" -}}
+{{- if and (not .Values.rabbitmqExternal.uriKey) (not .Values.rabbitmqExternal.uri) }}
 {{- $uri := "$(INVENIO_AMQP_BROKER_PROTOCOL)://$(INVENIO_AMQP_BROKER_USER):$(INVENIO_AMQP_BROKER_PASSWORD)@$(INVENIO_AMQP_BROKER_HOST):$(INVENIO_AMQP_BROKER_PORT)/$(INVENIO_AMQP_BROKER_VHOST)" -}}
 - name: INVENIO_AMQP_BROKER_USER
   {{- (include "invenio.rabbitmq.username" . | trim) | nindent 2 }}
@@ -362,10 +438,16 @@ valueFrom:
   value: $(INVENIO_BROKER_URL)
 - name: RABBITMQ_API_URI
   value: "http://$(INVENIO_AMQP_BROKER_USER):$(INVENIO_AMQP_BROKER_PASSWORD)@$(INVENIO_AMQP_BROKER_HOST):$(INVENIO_AMQP_BROKER_PORT)/api/"
-{{- end -}}
+{{- else }}
+- name: INVENIO_BROKER_URL
+  {{- (include "invenio.rabbitmq.uri" . | trim) | nindent 2 }}
+- name: INVENIO_CELERY_BROKER_URL
+  {{- (include "invenio.rabbitmq.uri" . | trim) | nindent 2 }}
+{{- end }}
+{{- end }}
 
 {{/*
-  Define a projected volume for PostgreSQL config file.
+  Define a projected volume for RabbitMQ config file.
 
   Usage:
     {{ include "invenio.rabbitmq.configFile" . | nindent 6 }}
@@ -375,30 +457,32 @@ valueFrom:
 */}}
 
 {{- define "invenio.rabbitmq.configFile" -}}
-{{- $fields := dict "username" "password" "hostname" "portString" "vhost" "protocol" }}
-{{- $parts := dict }}
-
+{{- $fields := dict "username" "INVENIO_AMQP_BROKER_USER" "password" "INVENIO_AMQP_BROKER_PASSWORD" "hostname" "INVENIO_AMQP_BROKER_HOST" "amqpPort" "INVENIO_AMQP_BROKER_PORT" "vhost" "INVENIO_AMQP_BROKER_VHOST" "protocol" "INVENIO_AMQP_BROKER_PROTOCOL" }}
 {{- $root := . }}
 - name: rabbitmq-config
   projected:
     sources:
-    {{- if or .Values.rabbitmqExternal.uri }}
+  {{- if .Values.rabbitmqExternal.uri }}
     - secret:
-        name: invenio-rabbitmq-inline
+        name: {{ include "invenio.fullname" $root }}-invenio-rabbitmq-inline
 	items:
 	- key: uri
-	  path: INVENIO_SQLALCHEMY_DATABASE_URI
-    {{- else if .Values.rabbitmqExternal.uriKey }}
+	  path: INVENIO_BROKER_URL
+	- key: uri
+	  path: INVENIO_CELERY_BROKER_URL
+  {{- else if .Values.rabbitmqExternal.uriKey }}
     - secret:
         name: {{ coalesce .Values.rabbitmqExternal.uriSecret (include "invenio.rabbitmq.secretName" $root | trim) }} 
         items:
         - key: {{ .Values.rabbitmqExternal.uriKey }} 
-          path: INVENIO_SQLALCHEMY_DATABASE_URI
-    {{- else }}
+          path: INVENIO_BROKER_URL
+        - key: {{ .Values.rabbitmqExternal.uriKey }} 
+          path: INVENIO_CELERY_BROKER_URL
+  {{- else }}
     {{- range $item, $value := $fields }}
     - secret:
       {{- if hasKey $root.Values.rabbitmqExternal $item }}
-        name: invenio-rabbitmq-inline
+        name: {{ include "invenio.fullname" $root }}-invenio-rabbitmq-inline
         items:
         - key: {{ $item }}
           path: {{ $value }}
@@ -410,12 +494,9 @@ valueFrom:
         - key: {{ get $root.Values.rabbitmqExternal $keyName }}
           path: {{ $value | toString }}
       {{- end }}
-      {{- end }}
     {{- end }}
+  {{- end }}
 {{- end }}
-
-
-
 
 
 #########################     OpenSearch hostname     #########################
@@ -584,7 +665,7 @@ valueFrom:
     sources:
     {{- if or .Values.postgresqlExternal.uri }}
     - secret:
-        name: invenio-postgresql-inline
+        name: {{ include "invenio.fullname" $root }}-invenio-postgresql-inline
 	items:
 	- key: uri
 	  path: INVENIO_SQLALCHEMY_DATABASE_URI
@@ -598,7 +679,7 @@ valueFrom:
     {{- range $item, $value := $fields }}
     - secret:
       {{- if hasKey $root.Values.postgresqlExternal $item }}
-        name: invenio-postgresql-inline
+        name: {{ include "invenio.fullname" $root }}-invenio-postgresql-inline
         items:
         - key: {{ $item }}
           path: {{ $value }}

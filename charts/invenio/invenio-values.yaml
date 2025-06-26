@@ -48,6 +48,9 @@ invenio:
   hostname: "vyvoj.du-k8s.du.cesnet.cz"
   existing_secret: false
   uwsgiExtraConfig: {}
+  extraEnvVars:
+    - name: INVENIO_CONFIG_PATH
+      value: /configs
   extraConfigFiles:
     - bbb-prepsec-secrets-invenio-datacitecfg
     - bbb-prepsec-secrets-invenio-glitchtip
@@ -57,10 +60,6 @@ invenio:
   extraEnvFrom:
     - secretRef:
         name: bbb-prepsec-secrets-invenio-config-path 
-    # - configMapRef:
-    #     name: bar
-
-
 
 nginx:
   image: "nginx:1.24.0"
@@ -269,16 +268,14 @@ redisExternal:
   passwordKey: "redisPassword"
   port: "6379"
   protocol: redis
+
 rabbitmq:
   enabled: false
-
 rabbitmqExternal: 
   configFile: true
-  #  username: iiiiinvenio
   existingSecret: "rabbitmq-cluster-example-default-user"
   usernameKey: "username"
   passwordKey: "password"
-    #portKey: "port"
   amqpPort: 5672
   managementPort: 15672
   hostnameKey: "host"

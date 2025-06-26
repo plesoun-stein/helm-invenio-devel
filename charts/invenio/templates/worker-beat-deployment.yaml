@@ -65,10 +65,6 @@ spec:
         env: 
         - name: TZ 
           value: {{ required "Missing .Values.global.timezone" .Values.global.timezone }} 
-        {{- if .Values.invenio.configDir }} 
-        - name: INVENIO_CONFIG_DIR 
-          value: {{ .Values.invenio.configDir }} 
-        {{- end }}
         {{- if not .Values.rabbitmqExternal.configFile }}
         {{- include "invenio.config.queue" . | nindent 8 }}
         {{- end }}

@@ -88,10 +88,6 @@ Return the proper Invenio image name
     {{- end }}
 {{- end }}
 
-
-
-
-
 ############################     Redis Hostname     ############################
 
 {{/*
@@ -115,11 +111,13 @@ Return the proper Invenio image name
 {{- printf "value: %s-master" (include "common.names.fullname" .Subcharts.redis) | nindent 0 }}
   {{- else if and (not .Values.redis.enabled) .Values.redisExternal.hostname }}
 {{- printf "value: %q" .Values.redisExternal.hostname | nindent 0 }}
-  {{- else }}
+  {{- else if and (not .Values.redis.enabled) .Values.redisExternal.hostnameKey }}
 valueFrom:
   secretKeyRef:
     name: {{ coalesce .Values.redisExternal.hostnameSecret (include "invenio.redis.secretName" . | trim) }}
     key: {{ required "Missing .Values.redisExternal.hostnameKey" (tpl  .Values.redisExternal.hostnameKey .) }}
+  {{- else }}
+{{- fail (printf "\n\nthere is somthing wrong with redis hostname,\n\nI'm printing contexts\n\nredis:\n\n\n%v\n\nredisExternal:\n%v" (toYaml .Values.redis) (toYaml .Values.redisExternal)) | indent 4 }} 
   {{- end -}}
 {{- end -}}
 
@@ -326,11 +324,13 @@ valueFrom:
 {{- printf "value: %q" (required "Missing .Values.rabbitmq.service.ports.amqp" (tpl (.Values.rabbitmq.service.ports.amqp | toString) .)) | nindent 0 }}
   {{- else if and (not .Values.rabbitmq.enabled) .Values.rabbitmqExternal.amqpPort }}
 {{- printf "value: %q" (.Values.rabbitmqExternal.amqpPort | toString) | nindent 0 }}
-  {{- else }}
+  {{- else if and (not .Values.rabbitmq.enabled) .Values.rabbitmqExternal.amqpPortKey }}
 valueFrom:
   secretKeyRef:
     name: {{ coalesce .Values.rabbitmqExternal.amqpPortSecret (include "invenio.rabbitmq.secretName" . | trim) }}
     key: {{ required "Missing .Values.rabbitmqExternal.amqpPortKey" (tpl  .Values.rabbitmqExternal.amqpPortKey .) }}
+  {{- else }}
+{{- printf "value: 5672" | nindent 0 }}
   {{- end -}}
 {{- end -}}
 
@@ -343,11 +343,13 @@ valueFrom:
 {{- printf "value: %q" (required "Missing .Values.rabbitmq.service.ports.manager" (tpl .Values.rabbitmq.service.ports.manager .)) | nindent 0 }}
   {{- else if and (not .Values.rabbitmq.enabled) .Values.rabbitmqExternal.managementPort }}
 {{- printf "value: %q" .Values.rabbitmqExternal.managementPort | nindent 0 }}
-  {{- else }}
+  {{- else if and (not .Values.rabbitmq.enabled) .Values.rabbitmqExternal.managementPortKey }}
 valueFrom:
   secretKeyRef:
     name: {{ coalesce .Values.rabbitmqExternal.managementPortSecret (include "invenio.rabbitmq.secretName" . | trim) }}
     key: {{ required "Missing .Values.rabbitmqExternal.managementPortKey" (tpl  .Values.rabbitmqExternal.managementPortKey .) }}
+  {{- else }}
+{{- printf "value: 15672" | nindent 0 }}
   {{- end -}}
 {{- end -}}
 

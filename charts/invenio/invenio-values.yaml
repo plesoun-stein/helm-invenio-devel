@@ -300,7 +300,7 @@ postgresqlExternal:
    uriKey: uri
    hostnameKey: host 
    portString: 5432
-   usernameKey: user
+     #usernameKey: user
    passwordKey: "password"
    databaseKey: dbname
 

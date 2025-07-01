@@ -75,7 +75,7 @@ Return the proper Invenio image name
   {{- tpl (required "Missing .Values.invenio.hostname" .Values.invenio.hostname) . }}
 {{- end -}}
 
-###########################     Invenio hostname     ###########################
+###########################     Invenio Extra Config files     ###########################
 
 {{- define "invenio.extraConfigFiles" -}}
 {{- $root := . }}
@@ -276,7 +276,7 @@ valueFrom:
   {{- else if and (not .Values.rabbitmq.enabled) .Values.rabbitmqExternal.existingSecret }}
     {{- required "Missing .Values.rabbitmqExternal.existingSecret" .Values.rabbitmqExternal.existingSecret }}
   {{- else }}
-    {{- fail (printf "\n\nthere is somthing wrong with rabbitmq secret,\n\nI'm printing contexts for rabbitmq\n\ninternal config\n%v\n\nexternal config\n%v" (toYaml .Values.rabbitmq) (toYaml .Values.rabbitmqExternal)) | indent 4 }} 
+    {{- fail (printf "\n\nthere is somthing wrong with rabbitmq secret,\n\nI'm printing contexts for rabbitmq\n\nrabbitmq:\n%v\n\nrabbitmqExternal:\n%v" (toYaml .Values.rabbitmq | nindent 2) (toYaml .Values.rabbitmqExternal | nindent 2)) | indent 4 }}
   {{- end }}
 {{- end -}}
 
@@ -521,8 +521,10 @@ valueFrom:
 {{- define "invenio.postgresql.secretName" -}}
   {{- if .Values.postgresql.enabled -}}
     {{- required "Missing .Values.postgresql.auth.existingSecret" (tpl .Values.postgresql.auth.existingSecret .) -}}
-  {{- else -}}
+  {{- else if and (not .Values.postgresql.enabled) .Values.postgresqlExternal.existingSecret -}}
     {{- required "Missing .Values.postgresqlExternal.existingSecret" (tpl .Values.postgresqlExternal.existingSecret .) -}}
+  {{- else }}
+    {{- fail (printf "\n\nthere is somthing wrong with postgresql congfiguration,\n\nI'm printing contexts.\n\npostgresql:%v\n\npostgresqlExternal:%v" (toYaml .Values.postgresql | nindent 2) (toYaml .Values.postgresqlExternal | nindent 2)) | indent 4 }}
   {{- end -}}
 {{- end -}}
 
@@ -534,11 +536,13 @@ valueFrom:
 {{- printf "value: %s" (required "Missing .Values.postgresql.auth.username" (tpl .Values.postgresql.auth.username .)) | nindent 0 }}
   {{- else if and (not .Values.postgresql.enabled) .Values.postgresqlExternal.username }}
 {{- printf "value: %s" .Values.postgresqlExternal.username | nindent 0 }}
-  {{- else }}
+  {{- else if and (not .Values.postgresql.enabled) .Values.postgresqlExternal.usernameKey }}
 valueFrom:
   secretKeyRef:
     name: {{ coalesce .Values.postgresqlExternal.usernameSecret (include "invenio.postgresql.secretName" . | trim) }}
     key: {{ required "Missing .Values.postgresqlExternal.usernameKey" (tpl  .Values.postgresqlExternal.usernameKey .) }}
+  {{- else }}
+    {{- fail (printf "\n\nthere is somthing wrong with postgresql congfiguration,\n\nI'm printing contexts.\n\npostgresql:%v\n\npostgresqlExternal:%v" (toYaml .Values.postgresql | nindent 2) (toYaml .Values.postgresqlExternal | nindent 2)) | indent 4 }}
   {{- end -}}
 {{- end -}}
 

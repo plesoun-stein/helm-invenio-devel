@@ -75,6 +75,14 @@ Return the proper Invenio image name
   {{- tpl (required "Missing .Values.invenio.hostname" .Values.invenio.hostname) . }}
 {{- end -}}
 
+###########################     Invenio inline configfile      ###########################
+{{/*
+  This template renders the hostname for Invenio.
+*/}}
+{{- define "invenio.inline.secretName" -}}
+{{- $root := .root }}
+{{ printf "%s-inline-%s" (include "invenio.fullname" $root) .myName }}
+{{- end -}}
 ###########################     Invenio Extra Config files     ###########################
 
 {{- define "invenio.extraConfigFiles" -}}
@@ -87,6 +95,32 @@ Return the proper Invenio image name
         name: {{ $secret }}
     {{- end }}
 {{- end }}
+
+###########################     Invenio failing config     ###########################
+
+{{/*
+invenio.failingConfig
+
+params:
+ - service: postgresql, redis, rabbitmq
+ - key: hostname, port, vhost etc.
+ - root: it's rootof the chart, to access Values like $root.Values.
+*/}}
+
+{{- define "invenio.failingConfig" -}}
+{{- $root := .root }}
+{{- $service := .service }}
+{{- $serviceExternal := (printf "%sExternal" $service) }}
+{{- $serviceContext := default dict (get $root.Values $service) }}
+{{- $serviceContextExternal := default dict (get $root.Values $serviceExternal) }}
+{{- $a := (printf "\n\n%s congfiguration" .service) }}
+{{- $b := (printf "\n\nmissing param: %s or %sKey" .key .key) }}
+{{- $c := (printf "\n\nprinting config contexts") }}
+{{- $d := (printf "\n\n%s:%v" $service ($serviceContext | toYaml | nindent 2)) }}
+{{- $e := (printf "\n\n%s:%v" $serviceExternal ($serviceContextExternal | toYaml | nindent 2)) }}
+{{- fail (printf "%s %s %s %v %v" $a $b $c $d $e) }} 
+{{- end }}
+
 
 ############################     Redis Hostname     ############################
 
@@ -491,6 +525,9 @@ valueFrom:
       {{- else }}
         {{- $keyName := (printf "%sKey" $item) }}
         {{- $secretName := (printf "%sSecret" $item) }}
+	{{- if not (hasKey $root.Values.rabbitmqExternal $keyName) }}
+        {{- fail (printf "\n\nthere is somthing wrong with rabbitmq config file definition. I'm missing key: %s,\n\n\nI'm printing contexts.\n\nrabbitmq:%v\n\nrabbitmqExternal:%v" $keyName (toYaml $root.Values.rabbitmq | nindent 2) (toYaml $root.Values.rabbitmqExternal | nindent 2)) | indent 4 }}
+        {{- end }}
         name: {{ coalesce (get $root.Values.rabbitmqExternal $secretName) (include "invenio.rabbitmq.secretName" $root | trim) }}
         items: 
         - key: {{ get $root.Values.rabbitmqExternal $keyName }}
@@ -516,6 +553,50 @@ valueFrom:
 #########################     PostgreSQL connection configuration     #########################
 
 {{/*
+  This template renders the envs for the PostgreSQL instance.
+  consumes 
+*/}}
+{{- define "invenio.svc.renderEnv" -}}
+{{- $root := . }}
+{{- $myVal := ( fromYaml .myVal) }}
+- name: {{ .envName }}
+  {{- if and (not (eq $myVal.instance "internalSecret")) (not (eq $myVal.instance "externalSecret")) }}
+  value: {{ printf "%q" $myVal.value }}
+  {{- else }}
+  valueFrom:
+    secretKeyRef:
+      name: {{ $myVal.secretName }}
+      key: {{ $myVal.value }}
+  {{- end -}}
+{{- end -}}
+
+
+
+{{/*
+  This template renders the projected secrets ofor the PostgreSQL instance.
+  consumes 
+*/}}
+{{- define "invenio.render.projectedSecret" -}}
+{{- $root := . }}
+{{- $myVal := ( fromYaml .myVal) }}
+{{- $envName := .envName }}
+{{- $myKey := "" }}
+{{- if or (eq $myVal.instance "internal") (eq $myVal.instance "external") }}
+{{- $myKey = $myVal.key }}
+{{- else }}
+{{- $myKey = $myVal.value }}
+{{- end }}
+- secret:
+    name: {{ $myVal.secretName }}
+    items:
+    - key: {{ $myKey }}
+      path: {{ $envName  }} 
+{{- end -}}
+
+
+
+
+{{/*
   Get the database cluster config secret name
 */}}
 {{- define "invenio.postgresql.secretName" -}}
@@ -532,99 +613,222 @@ valueFrom:
   This template renders the username used for the PostgreSQL instance.
 */}}
 {{- define "invenio.postgresql.username" -}}
-  {{- if .Values.postgresql.enabled -}}
-{{- printf "value: %s" (required "Missing .Values.postgresql.auth.username" (tpl .Values.postgresql.auth.username .)) | nindent 0 }}
-  {{- else if and (not .Values.postgresql.enabled) .Values.postgresqlExternal.username }}
-{{- printf "value: %s" .Values.postgresqlExternal.username | nindent 0 }}
-  {{- else if and (not .Values.postgresql.enabled) .Values.postgresqlExternal.usernameKey }}
-valueFrom:
-  secretKeyRef:
-    name: {{ coalesce .Values.postgresqlExternal.usernameSecret (include "invenio.postgresql.secretName" . | trim) }}
-    key: {{ required "Missing .Values.postgresqlExternal.usernameKey" (tpl  .Values.postgresqlExternal.usernameKey .) }}
+{{- $root := . }}
+{{- $return := dict }}
+{{- if .Values.postgresql.enabled -}}
+  {{- if .Values.postgresql.auth.username }}
+    {{- $_ := set $return "instance" "internal" }}
+    {{- $_ := set $return "key" "username" }}
+    {{- $_ := set $return "value" (required "Missing .values.postgresql.auth.username" (tpl .Values.postgresql.auth.username .)) }}
+    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "postgresql" "root" $root)) | trim) }}
   {{- else }}
-    {{- fail (printf "\n\nthere is somthing wrong with postgresql congfiguration,\n\nI'm printing contexts.\n\npostgresql:%v\n\npostgresqlExternal:%v" (toYaml .Values.postgresql | nindent 2) (toYaml .Values.postgresqlExternal | nindent 2)) | indent 4 }}
-  {{- end -}}
+    {{- include "invenio.failingConfig" (dict "root" $root "key" "username" "service" "postgresql") }} 
+  {{- end }}
+{{- else }}
+  {{- if .Values.postgresqlExternal.username }}
+    {{- $_ := set $return "instance" "external" }}
+    {{- $_ := set $return "key" "username" }}
+    {{- $_ := set $return "value" .Values.postgresqlExternal.username }}
+    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "postgresql" "root" $root)) | trim) }}
+  {{- else if .Values.postgresqlExternal.usernameKey }}
+    {{- $_ := set $return "instance" "externalSecret" }}
+    {{- $_ := set $return "key" "usernameKey" }}
+    {{- $_ := set $return "value" .Values.postgresqlExternal.usernameKey }}
+    {{- $_ := set $return "secretName" ( coalesce .Values.postgresqlExternal.usernameSecret (include "invenio.postgresql.secretName" . | trim)) }}
+  {{- else }}
+    {{- include "invenio.failingConfig" (dict "root" $root "key" "username" "service" "postgresql") }} 
+  {{- end }}
+{{- end -}}
+{{- toYaml $return }}
 {{- end -}}
 
 {{/*
   This template renders the hostname used for the PostgreSQL instance.
 */}}
-
 {{- define "invenio.postgresql.hostname" -}}
-  {{- if .Values.postgresql.enabled -}}
-{{- printf "value: %s" (include "postgresql.v1.primary.fullname" .Subcharts.postgresql) | nindent 0 -}}
-  {{- else if and (not .Values.postgresql.enabled) .Values.postgresqlExternal.hostname }}
-{{- printf "value: %s" .Values.postgresqlExternal.hostname | nindent 0 }}
+{{- $root := . }}
+{{- $return := dict }}
+{{- if .Values.postgresql.enabled -}}
+  {{- if .Values.postgresql.hostname }}
+    {{- $_ := set $return "instance" "internal" }}
+    {{- $_ := set $return "key" "hostname" }}
+    {{- $_ := set $return "value" (required "Missing .Values.postgresql.hostname" (tpl .Values.postgresql.hostname .)) }}
+    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "postgresql" "root" $root)) | trim) }}
   {{- else }}
-valueFrom:
-  secretKeyRef:
-    name: {{ coalesce .Values.postgresqlExternal.hostnameSecret (include "invenio.postgresql.secretName" . | trim) }}
-    key: {{ required "Missing .Values.postgresqlExternal.hostnameKey" (tpl  .Values.postgresqlExternal.hostnameKey .) }}
-  {{- end -}}
+    {{- include "invenio.failingConfig" (dict "root" $root "key" "hostname" "service" "postgresql") }} 
+  {{- end }}
+{{- else }}
+  {{- if .Values.postgresqlExternal.hostname }}
+    {{- $_ := set $return "instance" "external" }}
+    {{- $_ := set $return "key" "hostname" }}
+    {{- $_ := set $return "value" "hostname" }}
+    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "postgresql" "root" $root)) | trim) }}
+  {{- else if .Values.postgresqlExternal.hostnameKey }}
+    {{- $_ := set $return "instance" "externalSecret" }}
+    {{- $_ := set $return "key" "hostnameKey" }}
+    {{- $_ := set $return "value" .Values.postgresqlExternal.hostnameKey }}
+    {{- $_ := set $return "secretName" ( coalesce .Values.postgresqlExternal.hostnameSecret (include "invenio.postgresql.secretName" . | trim)) }}
+  {{- else }}
+    {{- include "invenio.failingConfig" (dict "root" $root "key" "hostname" "service" "postgresql") }} 
+  {{- end }}
+{{- end -}}
+{{- toYaml $return }}
 {{- end -}}
 
 {{/*
   This template renders the password used for the PostgreSQL instance.
   In production environments we encourage you to use secrets instead.
 */}}
-
 {{- define "invenio.postgresql.password" -}}
-  {{- if .Values.postgresql.enabled -}}
-{{- printf "value: %s" (required "Missing .Values.postgresql.auth.password" .Values.postgresql.auth.password) | nindent 0 -}}
-  {{- else if and (not .Values.postgresql.enabled) .Values.postgresqlExternal.password }}
-{{- printf "value: %s" .Values.postgresqlExternal.password | nindent 0 }}
+{{- $root := . }}
+{{- $return := dict }}
+{{- if and .Values.postgresql.enabled }} 
+  {{- if .Values.postgresql.auth.password -}}
+    {{- $_ := set $return "instance" "internal" }}
+    {{- $_ := set $return "key" "password" }}
+    {{- $_ := set $return "value" (required "Missing .Values.postgresql.auth.password" (tpl .Values.postgresql.auth.password .)) }}
+    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "postgresql" "root" $root)) | trim) }}
+  {{- else if .Values.postgresql.auth.existingSecret -}}
+    {{- $_ := set $return "instance" "internalSecret" }}
+    {{- $_ := set $return "key" "userPasswordKey" }}
+    {{- $_ := set $return "value" (required "Missing .Values.postgresql.auth.secretKeys.userPasswordKey" (tpl .Values.postgresql.auth.secretKeys.userPasswordKey .)) -}}
+    {{- $_ := set $return "secretName"  (include "invenio.postgresql.secretName" .) }}
   {{- else }}
-valueFrom:
-  secretKeyRef:
-    name: {{ coalesce .Values.postgresqlExternal.passwordSecret (include "invenio.postgresql.secretName" . | trim) }}
-    key: {{ required "Missing .Values.postgresqlExternal.passwordKey" (tpl  .Values.postgresqlExternal.passwordKey .) }}
+    {{- include "invenio.failingConfig" (dict "root" $root "key" "password" "service" "postgresql") }} 
+  {{- end }}
+{{- else }} 
+  {{- if and .Values.postgresqlExternal.password }}
+    {{- $_ := set $return "instance" "external" }}
+    {{- $_ := set $return "key" "password" }}
+    {{- $_ := set $return "value" .Values.postgresqlExternal.password }}
+    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "postgresql" "root" $root)) | trim) }}
+  {{- else if .Values.postgresqlExternal.passwordKey }}
+    {{- $_ := set $return "instance" "externalSecret" }}
+    {{- $_ := set $return "key" "passwordKey" }}
+    {{- $_ := set $return "value" .Values.postgresqlExternal.passwordKey }}
+    {{- $_ := set $return "secretName" ( coalesce .Values.postgresqlExternal.passwordSecret (include "invenio.postgresql.secretName" . | trim)) }}
+  {{- else }}
+    {{- include "invenio.failingConfig" (dict "root" $root "key" "password" "service" "postgresql") }} 
   {{- end -}}
+{{- end -}}
+{{- toYaml $return }}
 {{- end -}}
 
 {{/*
   This template renders the port number used for the PostgreSQL instance (as a string).
 */}}
 {{- define "invenio.postgresql.portString" -}}
-  {{- if .Values.postgresql.enabled -}}
-{{- printf "value: %q" (required "Missing .Values.postgresql.primary.service.ports.postgresql" (tpl (toString .Values.postgresql.primary.service.ports.postgresql) .)) | nindent 0 -}}
-  {{- else if and (not .Values.postgresql.enabled) .Values.postgresqlExternal.portString }}
-{{- printf "value: %q" (.Values.postgresqlExternal.portString | toString) | nindent 0 }}
+{{- $root := . }}
+{{- $return := dict }}
+{{- if .Values.postgresql.enabled -}}
+    {{- $_ := set $return "instance" "internal" }}
+    {{- $_ := set $return "key" "portString" }}
+    {{- $_ := set $return "value" (required "Missing .Values.postgresql.primary.service.ports.postgresql" (tpl (toString .Values.postgresql.primary.service.ports.postgresql) .)) }}
+    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "postgresql" "root" $root)) | trim) }}
+{{- else }}
+  {{- if .Values.postgresqlExternal.portString }}
+    {{- $_ := set $return "instance" "external" }}
+    {{- $_ := set $return "key" "portString" }}
+    {{- $_ := set $return "value" (tpl (toString .Values.postgresqlExternal.portString) . | toString) }}
+    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "postgresql" "root" $root)) | trim) }}
+  {{- else if .Values.postgresqlExternal.portStringKey }}
+    {{- $_ := set $return "instance" "externalSecret" }}
+    {{- $_ := set $return "key" "portStringKey" }}
+    {{- $_ := set $return "value" .Values.postgresqlExternal.portStringKey }}
+    {{- $_ := set $return "secretName" ( coalesce .Values.postgresqlExternal.portStringSecret (include "invenio.postgresql.secretName" . | trim)) }}
   {{- else }}
-valueFrom:
-  secretKeyRef:
-    name: {{ coalesce .Values.postgresqlExternal.portStringSecret (include "invenio.postgresql.secretName" . | trim) }}
-    key: {{ required "Missing .Values.postgresqlExternal.portStringKey" (tpl  .Values.postgresqlExternal.portStringKey .) }}
-  {{- end -}}
+    {{- include "invenio.failingConfig" (dict "root" $root "key" "portString" "service" "postgresql") }} 
+  {{- end }}
+{{- end -}}
+{{- toYaml $return }}
 {{- end -}}
 
 {{/*
   This template renders the name of the database in PostgreSQL.
 */}}
 {{- define "invenio.postgresql.database" -}}
-  {{- if .Values.postgresql.enabled -}}
-{{- printf "value: %s" (required "Missing .Values.postgresql.auth.database" (tpl .Values.postgresql.auth.database .)) | nindent 0 }}
-  {{- else if and (not .Values.postgresql.enabled) .Values.postgresqlExternal.database }}
-{{- printf "value: %s" .Values.postgresqlExternal.database | nindent 0 }}
+{{- $root := . }}
+{{- $return := dict }}
+{{- if .Values.postgresql.enabled -}}
+    {{- $_ := set $return "instance" "internal" }}
+    {{- $_ := set $return "key" "database" }}
+    {{- $_ := set $return "value" (required "Missing .Values.postgresql.auth.database" (tpl .Values.postgresql.auth.database .)) }}
+    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "postgresql" "root" $root)) | trim) }}
+{{- else }}
+  {{- if .Values.postgresqlExternal.database }}
+    {{- $_ := set $return "instance" "external" }}
+    {{- $_ := set $return "key" "database" }}
+    {{- $_ := set $return "value" .Values.postgresqlExternal.database }}
+    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "postgresql" "root" $root)) | trim) }}
+  {{- else if .Values.postgresqlExternal.databaseKey }}
+    {{- $_ := set $return "instance" "externalSecret" }}
+    {{- $_ := set $return "key" "databaseKey" }}
+    {{- $_ := set $return "value" .Values.postgresqlExternal.databaseKey }}
+    {{- $_ := set $return "secretName" ( coalesce .Values.postgresqlExternal.databaseSecret (include "invenio.postgresql.secretName" . | trim)) }}
   {{- else }}
-valueFrom:
-  secretKeyRef:
-    name: {{ coalesce .Values.postgresqlExternal.databaseSecret (include "invenio.postgresql.secretName" . | trim) }}
-    key: {{ required "Missing .Values.postgresqlExternal.databaseKey" (tpl  .Values.postgresqlExternal.databaseKey .) }}
-  {{- end -}}
+    {{- include "invenio.failingConfig" (dict "root" $root "key" "database" "service" "postgresql") }} 
+  {{- end }}
+{{- end -}}
+{{- toYaml $return }}
+{{- end -}}
+
+{{/*
+  This template renders the port number used for the PostgreSQL instance (as a string).
+*/}}
+{{- define "invenio.postgresql.protocol" -}}
+{{- $root := . }}
+{{- $return := dict }}
+{{- if .Values.postgresql.enabled -}}
+  {{- if .Values.postgresql.protocol }}
+    {{- $_ := set $return "instance" "internal" }}
+    {{- $_ := set $return "key" "protocol" }}
+    {{- $_ := set $return "value" (tpl .Values.postgresql.protocol .) }}
+    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "postgresql" "root" $root)) | trim) }}
+  {{- else }}
+    {{- $_ := set $return "instance" "internal" }}
+    {{- $_ := set $return "key" "protocol" }}
+    {{- $_ := set $return "value" "postgresql+psycopg2"}}
+    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "postgresql" "root" $root)) | trim) }}
+  {{- end }}
+{{- else }}
+  {{- if .Values.postgresqlExternal.protocol }}
+    {{- $_ := set $return "instance" "external" }}
+    {{- $_ := set $return "key" "protocol" }}
+    {{- $_ := set $return "value" (tpl (toString .Values.postgresqlExternal.protocol) . | toString) }}
+    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "postgresql" "root" $root)) | trim) }}
+  {{- else if .Values.postgresqlExternal.protocolKey }}
+    {{- $_ := set $return "instance" "externalSecret" }}
+    {{- $_ := set $return "key" "protocolKey" }}
+    {{- $_ := set $return "value" .Values.postgresqlExternal.protocolKey }}
+    {{- $_ := set $return "secretName" ( coalesce .Values.postgresqlExternal.protocolSecret (include "invenio.postgresql.secretName" . | trim)) }}
+  {{- else }}
+    {{- $_ := set $return "instance" "external" }}
+    {{- $_ := set $return "key" "protocol" }}
+    {{- $_ := set $return "value" "postgresql+psycopg2"}}
+    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "postgresql" "root" $root)) | trim) }}
+  {{- end }}
+{{- end -}}
+{{- toYaml $return }}
 {{- end -}}
 
 {{/*
   This template renders the name of the uri in PostgreSQL.
 */}}
 {{- define "invenio.postgresql.uri" -}}
+{{- $root := . }}
+{{- $return := dict }}
   {{- if and (not .Values.postgresql.enabled) .Values.postgresqlExternal.uri }}
-{{- printf "value: %s" .Values.postgresqlExternal.uri | nindent 0 }}
+    {{- $_ := set $return "instance" "external" }}
+    {{- $_ := set $return "key" "uri" }}
+    {{- $_ := set $return "value" (tpl (toString .Values.postgresqlExternal.uri) . | toString) }}
+    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "postgresql" "root" $root)) | trim) }}
   {{- else if and (not .Values.postgresql.enabled) .Values.postgresqlExternal.uriKey }}
-valueFrom:
-  secretKeyRef:
-    name: {{ coalesce .Values.postgresqlExternal.uriSecret (include "invenio.postgresql.secretName" . | trim) }}
-    key: {{ required "Missing .Values.postgresqlExternal.uriKey" (tpl  .Values.postgresqlExternal.uriKey .) }}
+    {{- $_ := set $return "instance" "externalSecret" }}
+    {{- $_ := set $return "key" "uriKey" }}
+    {{- $_ := set $return "value" .Values.postgresqlExternal.uriKey }}
+    {{- $_ := set $return "secretName" ( coalesce .Values.postgresqlExternal.protocolSecret (include "invenio.postgresql.secretName" . | trim)) }}
   {{- end -}}
+{{- toYaml $return }}
 {{- end -}}
 
 {{/*
@@ -632,23 +836,18 @@ valueFrom:
 */}}
 {{- define "invenio.config.database" -}}
 {{- if and (not .Values.postgresqlExternal.uriKey) (not .Values.postgresqlExternal.uri) }} 
-- name: INVENIO_DB_USER
-  {{- (include "invenio.postgresql.username" . | trim) | nindent 2 }}
-- name: INVENIO_DB_HOST
-  {{- (include "invenio.postgresql.hostname" . | trim) | nindent 2 }}
-- name: INVENIO_DB_PORT
-  {{- (include "invenio.postgresql.portString" . | trim) | nindent 2 }}
-- name: INVENIO_DB_NAME
-  {{- (include "invenio.postgresql.database" . | trim) | nindent 2 }}
-- name: INVENIO_DB_PROTOCOL
-  value: "postgresql+psycopg2"
-- name: INVENIO_DB_PASSWORD
-  {{- (include "invenio.postgresql.password" . | trim) | nindent 2 }}
+
+{{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.postgresql.database" .) "envName" "INVENIO_DB_NAME") | trim | nindent 0 }}
+{{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.postgresql.username" .) "envName" "INVENIO_DB_USER") | trim | nindent 0 }}
+{{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.postgresql.hostname" .) "envName" "INVENIO_DB_HOST") | trim | nindent 0 }}
+{{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.postgresql.portString" .) "envName" "INVENIO_DB_PORT") | trim | nindent 0 }}
+{{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.postgresql.password" .) "envName" "INVENIO_DB_PASSWORD") | trim | nindent 0 }}
+{{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.postgresql.protocol" .) "envName" "INVENIO_DB_PROTOCOL") | trim | nindent 0 }}
 - name: INVENIO_SQLALCHEMY_DATABASE_URI
   value: "$(INVENIO_DB_PROTOCOL)://$(INVENIO_DB_USER):$(INVENIO_DB_PASSWORD)@$(INVENIO_DB_HOST):$(INVENIO_DB_PORT)/$(INVENIO_DB_NAME)"
+
 {{- else }}
-- name: INVENIO_SQLALCHEMY_DATABASE_URI
-  {{- (include "invenio.postgresql.uri" . | trim) | nindent 2 }}
+{{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.postgresql.uri" .) "envName" "INVENIO_SQLALCHEMY_DATABASE_URI") | trim | nindent 0 }}
 {{- end }}
 {{- end -}}
 
@@ -664,23 +863,13 @@ valueFrom:
 */}}
 
 {{- define "invenio.postgresql.configFile" -}}
-{{- $fields := dict "username" "INVENIO_DB_USER" "password" "INVENIO_DB_PASSWORD" "hostname" "INVENIO_DB_HOST" "portString" "INVENIO_DB_PORT" "database" "INVENIO_DB_NAME" }}
+{{- $fields := dict "username" "INVENIO_DB_USER" "password" "INVENIO_DB_PASSWORD" "hostname" "INVENIO_DB_HOST" "portString" "INVENIO_DB_PORT" "database" "INVENIO_DB_NAME" "protocol" "INVENIO_DB_PROTOCOL" }}
 {{- $root := . }}
 - name: postgresql-config
   projected:
     sources:
-    {{- if or .Values.postgresqlExternal.uri }}
-    - secret:
-        name: {{ include "invenio.fullname" $root }}-invenio-postgresql-inline
-	items:
-	- key: uri
-	  path: INVENIO_SQLALCHEMY_DATABASE_URI
-    {{- else if .Values.postgresqlExternal.uriKey }}
-    - secret:
-        name: {{ coalesce .Values.postgresqlExternal.uriSecret (include "invenio.postgresql.secretName" $root | trim) }} 
-        items:
-        - key: {{ .Values.postgresqlExternal.uriKey }} 
-          path: INVENIO_SQLALCHEMY_DATABASE_URI
+    {{- if and (not .Values.postgresql.enabled) (or .Values.postgresqlExternal.uri .Values.postgresqlExternal.uriKey) }}
+    {{- include "invenio.render.projectedSecret" (dict "myVal" (include "invenio.postgresql.uri" .) "envName" "INVENIO_SQLALCHEMY_DATABASE_URI") | trim | nindent 4 }}
     {{- else }}
     {{- range $item, $value := $fields }}
     - secret:
@@ -692,6 +881,9 @@ valueFrom:
       {{- else }}
         {{- $keyName := (printf "%sKey" $item) }}
         {{- $secretName := (printf "%sSecret" $item) }}
+	{{- if not (hasKey $root.Values.postgresqlExternal $keyName) }}
+        {{- fail (printf "\n\nthere is somthing wrong with postgresql config file definition. I'm missing key: %s,\n\n\nI'm printing contexts.\n\npostgresql:%v\n\npostgresqlExternal:%v" $keyName (toYaml $root.Values.postgresql | nindent 2) (toYaml $root.Values.postgresqlExternal | nindent 2)) | indent 4 }}
+        {{- end }}
         name: {{ coalesce (get $root.Values.postgresqlExternal $secretName) (include "invenio.postgresql.secretName" $root | trim) }}
         items: 
         - key: {{ get $root.Values.postgresqlExternal $keyName }}

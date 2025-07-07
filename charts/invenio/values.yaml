@@ -609,6 +609,7 @@ postgresql:
     password: ""
     database: invenio
     existingSecret: ""
+  hostname: '{{ printf "%s" (include "postgresql.v1.primary.fullname" .Subcharts.postgresql) }}'
 
 ## External PostgreSQL configuration
 ## All of these values are only used when postgresql.enabled is set to false

@@ -295,15 +295,17 @@ postgresql:
   enabled: false
 
 postgresqlExternal: 
-   configFile: true
-   existingSecret: nr-repo-docs-test-cn-pg-app
-   uriKey: uri
-   hostnameKey: host 
-   portString: 5432
-     #usernameKey: user
-   passwordKey: "password"
-   databaseKey: dbname
-
+  configFile: true
+  existingSecret: nr-repo-docs-test-cn-pg-app
+    #uriKey: uri
+    #uri: bbbbbbbbbbbbbbbbbbbbbbbb
+  hostnameKey: host 
+  portString: "5432"
+    #usernameKey: user
+  username: aaaa
+  passwordKey: "password"
+  databaseKey: dbname
+    #database: test
 opensearch:
   enabled: false
 

@@ -63,9 +63,9 @@ spec:
         {{- end }}
         env:
         - name: TZ
-          value: {{ required "Missing .Values.global.timezone" .Values.global.timezone }}
+          value: {{ required "Missing .Values.global.timezone" .Values.global.timezone | quote }}
         {{- if not .Values.rabbitmqExternal.configFile }}
-        {{- include "invenio.config.queue" . | nindent 8 }}
+        {{- (include "invenio.config.queue" . | trim) | nindent 8 }}
         {{- end }}
         {{- if not .Values.postgresqlExternal.configFile }}
         {{- include "invenio.config.database" . | nindent 8 }}

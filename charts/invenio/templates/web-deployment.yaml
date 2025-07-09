@@ -68,10 +68,10 @@ spec:
         {{- (include "invenio.config.queue" . | trim) | nindent 8 }}
         {{- end }}
         {{- if not .Values.postgresqlExternal.configFile }}
-        {{- include "invenio.config.database" . | nindent 8 }}
+        {{- (include "invenio.config.database" . | trim) | nindent 8 }}
         {{- end }}
         {{- if not .Values.redisExternal.configFile }}
-        {{- include "invenio.config.cache" . | nindent 8 }}
+        {{- (include "invenio.config.cache" . | trim) | nindent 8 }}
         {{- end }}
         {{- with .Values.invenio.extraEnvVars }}
         {{-  toYaml . | nindent 8 }}

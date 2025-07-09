@@ -262,7 +262,7 @@ persistence:
 redis:
   enabled: false
 redisExternal:
-  configFile: true
+  configFile: false
   existingSecret: nr-repo-docs-test-invenio-backend-services-redis 
   hostname: "nr-repo-docs-test-redis-master"
   passwordKey: "redisPassword"
@@ -277,7 +277,7 @@ rabbitmqExternal:
   usernameKey: "username"
   passwordKey: "password"
   amqpPortString: 5672
-  managementPort: 15672
+  managementPortString: 15672
   hostnameKey: "host"
   vhost: ""
   #  password: "hhhhhh"

@@ -122,6 +122,60 @@ params:
 {{- end }}
 
 
+###########################     Invenio env render     ###########################
+{{/*
+  This template renders the envs for the PostgreSQL instance.
+  consumes 
+*/}}
+{{- define "invenio.svc.renderEnv" -}}
+{{- $root := . }}
+{{- $myVal := ( fromYaml .myVal) }}
+- name: {{ .envName }}
+  {{- if and (not (eq $myVal.instance "internalSecret")) (not (eq $myVal.instance "externalSecret")) }}
+  value: {{ printf "%s" (toString $myVal.value) }}
+  {{- else }}
+  valueFrom:
+    secretKeyRef:
+      name: {{ $myVal.secretName }}
+      key: {{ $myVal.value }}
+  {{- end -}}
+{{- end -}}
+
+###########################     Invenio projected secret render     ###########################
+{{/*
+  This template renders the projected secrets ofor the PostgreSQL instance.
+  consumes 
+*/}}
+{{- define "invenio.render.projectedSecret" -}}
+{{- $root := . }}
+{{- $myVal := ( fromYaml .myVal) }}
+{{- $envName := .envName }}
+{{- $myKey := "" }}
+{{- if or (eq $myVal.instance "internal") (eq $myVal.instance "external") }}
+{{- $myKey = $myVal.key }}
+{{- else }}
+{{- $myKey = $myVal.value }}
+{{- end }}
+- secret:
+    name: {{ $myVal.secretName }}
+    items:
+    - key: {{ $myKey }}
+      path: {{ $envName  }} 
+{{- end -}}
+
+#######################     Ingress TLS secret name     #######################
+{{/*
+  This template renders the name of the TLS secret used in
+  `Ingress.spec.tls.secretName`.
+*/}}
+{{- define "invenio.tlsSecretName" -}}
+  {{- if .Values.ingress.tlsSecretNameOverride }}
+    {{- tpl .Values.ingress.tlsSecretNameOverride $ }}
+  {{- else }}
+    {{- include "invenio.hostname" . -}}-tls
+  {{- end }}
+{{- end -}}
+
 ############################     Redis Hostname     ############################
 
 {{/*
@@ -132,8 +186,6 @@ params:
     {{- include "redis.secretName" .Subcharts.redis }}
   {{- else if and (not .Values.redis.enabled) .Values.redisExternal.existingSecret }}
     {{- required "Missing .Values.redisExternal.existingSecret" .Values.redisExternal.existingSecret }}
-  {{- else }}
-    {{- fail (printf "\n\nInternal redis is disabled\n\nexternalRedis is missing existingSecret key,\n\nI'm printing contexts \n\n\nredis:\n%v\n\n\nexternalRedis:\n%v" (toYaml .Values.redis | indent 2) (toYaml .Values.redisExternal | indent 2)) | indent 4 }} 
   {{- end }}
 {{- end -}}
 
@@ -141,72 +193,134 @@ params:
   This template renders the hostname for Redis.
 */}}
 {{- define "invenio.redis.hostname" -}}
-  {{- if .Values.redis.enabled }}
-{{- printf "value: %s-master" (include "common.names.fullname" .Subcharts.redis) | nindent 0 }}
-  {{- else if and (not .Values.redis.enabled) .Values.redisExternal.hostname }}
-{{- printf "value: %q" .Values.redisExternal.hostname | nindent 0 }}
-  {{- else if and (not .Values.redis.enabled) .Values.redisExternal.hostnameKey }}
-valueFrom:
-  secretKeyRef:
-    name: {{ coalesce .Values.redisExternal.hostnameSecret (include "invenio.redis.secretName" . | trim) }}
-    key: {{ required "Missing .Values.redisExternal.hostnameKey" (tpl  .Values.redisExternal.hostnameKey .) }}
+{{- $root := . }}
+{{- $return := dict }}
+{{- if .Values.redis.enabled -}}
+    {{- $_ := set $return "instance" "internal" }}
+    {{- $_ := set $return "key" "hostname" }}
+    {{- $_ := set $return "value" (printf "%s" (include "common.names.fullname" $root.Subcharts.redis)) }}
+    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "redis" "root" $root)) | trim) }}
+{{- else }}
+  {{- if .Values.redisExternal.hostname }}
+    {{- $_ := set $return "instance" "external" }}
+    {{- $_ := set $return "key" "hostname" }}
+    {{- $_ := set $return "value" .Values.redisExternal.hostname }}
+    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "redis" "root" $root)) | trim) }}
+  {{- else if .Values.redisExternal.hostnameKey }}
+    {{- $_ := set $return "instance" "externalSecret" }}
+    {{- $_ := set $return "key" "hostnameKey" }}
+    {{- $_ := set $return "value" .Values.redisExternal.hostnameKey }}
+    {{- $_ := set $return "secretName" ( coalesce .Values.redisExternal.hostnameSecret (include "invenio.redis.secretName" . | trim)) }}
   {{- else }}
-{{- fail (printf "\n\nthere is somthing wrong with redis hostname,\n\nI'm printing contexts\n\nredis:\n\n\n%v\n\nredisExternal:\n%v" (toYaml .Values.redis) (toYaml .Values.redisExternal)) | indent 4 }} 
-  {{- end -}}
+    {{- include "invenio.failingConfig" (dict "root" $root "key" "hostname" "service" "redis") }}
+  {{- end }}
+{{- end -}}
+{{- toYaml $return }}
 {{- end -}}
 
 {{/*
   This template renders the password for Redis.
 */}}
 {{- define "invenio.redis.password" -}}
-  {{- if and .Values.redis.enabled .Values.redis.auth.enabled }}
-{{- printf "value: %s" (required "Missing .Values.redis.auth.username" (tpl .Values.redis.auth.username .)) | nindent 0 }}
-  {{- else if and (not .Values.redis.enabled) .Values.redisExternal.password }}
-{{- printf "value: %q" (.Values.redisExternal.password | toString) | nindent 0 }}
-  {{- else if and (not .Values.redis.enabled) .Values.redisExternal.passwordKey }}
-valueFrom:
-  secretKeyRef:
-    name: {{ coalesce .Values.redisExternal.passwordSecret (include "invenio.redis.secretName" . | trim) }}
-    key: {{ required "Missing .Values.redisExternal.passwordKey" (tpl  .Values.redisExternal.passwordKey .) }}
+{{- $root := . }}
+{{- $return := dict }}
+{{- if and .Values.redis.enabled }} 
+  {{- if .Values.redis.password }}
+    {{- $_ := set $return "instance" "internal" }}
+    {{- $_ := set $return "key" "password" }}
+    {{- $_ := set $return "value" (required "Missing .Values.redis.auth.password" (tpl .Values.redis.auth.password .)) }}
+    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "redis" "root" $root)) | trim) }}
+  {{- else if .Values.redis.auth.existingSecret -}}
+    {{- $_ := set $return "instance" "internalSecret" }}
+    {{- $_ := set $return "key" "existingSecretPasswordKey" }}
+    {{- $_ := set $return "value" (required "Missing .Values.redis.auth.existingSecretPasswordKey" (tpl .Values.redis.auth.existingSecretPasswordKey .)) -}}
+    {{- $_ := set $return "secretName"  .Values.redis.auth.existingPasswordSecret }}
   {{- else }}
-{{/* - fail (printf "\n\nthere is somthing wrong with redis password,\n\nI'm printing contexts for redis\n\ninternal config:\n%v\n\nexternal config:\n%v" (toYaml .Values.redis) (toYaml .Values.redisExternal)) | indent 4 */}} 
+    {{- $_ := set $return "instance" "internalSecret" }}
+    {{- $_ := set $return "key" "password" }}
+    {{- $_ := set $return "value" "redis-password" -}}
+    {{- $_ := set $return "secretName" ( include "redis.secretName" $root.Subcharts.redis | trim) }}
+  {{- end }}
+{{- else }} 
+  {{- if and .Values.redisExternal.password }}
+    {{- $_ := set $return "instance" "external" }}
+    {{- $_ := set $return "key" "password" }}
+    {{- $_ := set $return "value" .Values.redisExternal.password }}
+    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "redis" "root" $root)) | trim) }}
+  {{- else if .Values.redisExternal.passwordKey }}
+    {{- $_ := set $return "instance" "externalSecret" }}
+    {{- $_ := set $return "key" "passwordKey" }}
+    {{- $_ := set $return "value" .Values.redisExternal.passwordKey }}
+    {{- $_ := set $return "secretName" ( coalesce .Values.redisExternal.passwordSecret (include "invenio.redis.secretName" . | trim)) }}
+  {{- else }}
+    {{- include "invenio.failingConfig" (dict "root" $root "key" "password" "service" "redis") }} 
   {{- end -}}
+{{- end -}}
+{{- toYaml $return }}
 {{- end -}}
 
 {{/*
   This template renders the protocol for accessing Redis.
 */}}
 {{- define "invenio.redis.protocol" -}}
-  {{- if .Values.redis.enabled }}
-{{- printf "value: redis" | nindent 0 }}
-  {{- else if and (not .Values.redis.enabled) .Values.redisExternal.protocol }}
-{{- printf "value: %s" .Values.redisExternal.protocol | nindent 0 }}
-  {{- else if and (not .Values.redis.enabled) .Values.redisExternal.protocolKey }}
-valueFrom:
-  secretKeyRef:
-    name: {{ coalesce .Values.redisExternal.protocolSecret (include "invenio.redis.secretName" . | trim) }}
-    key: {{ required "Missing .Values.redisExternal.protocolKey" (tpl  .Values.redisExternal.protocolKey .) }}
-  {{- else }}  
-{{- printf "value: redis" | nindent 0 }}
-  {{- end -}}
+{{- $root := . }}
+{{- $return := dict }}
+{{- if .Values.redis.enabled -}}
+    {{- $_ := set $return "instance" "internal" }}
+    {{- $_ := set $return "key" "protocol" }}
+    {{- $_ := set $return "value" "redis" }}
+    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "redis" "root" $root)) | trim) }}
+{{- else }}
+  {{- if .Values.redisExternal.protocol }}
+    {{- $_ := set $return "instance" "external" }}
+    {{- $_ := set $return "key" "protocol" }}
+    {{- $_ := set $return "value" (tpl (toString .Values.redisExternal.protocol) . | toString) }}
+    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "redis" "root" $root)) | trim) }}
+  {{- else if .Values.redisExternal.protocolKey }}
+    {{- $_ := set $return "instance" "externalSecret" }}
+    {{- $_ := set $return "key" "protocolKey" }}
+    {{- $_ := set $return "value" .Values.redisExternal.protocolKey }}
+    {{- $_ := set $return "secretName" ( coalesce .Values.redisExternal.protocolSecret (include "invenio.redis.secretName" . | trim)) }}
+  {{- else }}
+    {{- $_ := set $return "instance" "external" }}
+    {{- $_ := set $return "key" "protocol" }}
+    {{- $_ := set $return "value" "redis" }}
+    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "redis" "root" $root)) | trim) }}
+  {{- end }}
+{{- end -}}
+{{- toYaml $return }}
 {{- end -}}
 
 {{/*
   This template renders the port for accessing Redis.
 */}}
 {{- define "invenio.redis.port" -}}
-  {{- if .Values.redis.enabled }}
-{{- printf "value: 6379" | nindent 0 }}
-  {{- else if and (not .Values.redis.enabled) .Values.redisExternal.port }}
-{{- printf "value: %q" (.Values.redisExternal.port | toString) | nindent 0 }}
-  {{- else if and (not .Values.redis.enabled) .Values.redisExternal.portKey }}
-valueFrom:
-  secretKeyRef:
-    name: {{ coalesce .Values.redisExternal.portSecret (include "invenio.redis.secretName" . | trim) }}
-    key: {{ required "Missing .Values.redisExternal.portKey" (tpl  .Values.redisExternal.portKey .) }}
-  {{- else }}  
-{{- printf "value: %q" "6379" | nindent 0 }}
-  {{- end -}}
+{{- $root := . }}
+{{- $return := dict }}
+{{- if .Values.redis.enabled -}}
+    {{- $_ := set $return "instance" "internal" }}
+    {{- $_ := set $return "key" "redisPortString" }}
+    {{- $_ := set $return "value" ( toString "6379") }}
+    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "redis" "root" $root)) | trim) }}
+{{- else }}
+  {{- if .Values.redisExternal.redisPortString }}
+    {{- $_ := set $return "instance" "external" }}
+    {{- $_ := set $return "key" "redisPortString" }}
+    {{- $_ := set $return "value" (tpl (toString .Values.redisExternal.redisPortString) . | toString) }}
+    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "redis" "root" $root)) | trim) }}
+  {{- else if .Values.redisExternal.redisPortStringKey }}
+    {{- $_ := set $return "instance" "externalSecret" }}
+    {{- $_ := set $return "key" "redisPortStringKey" }}
+    {{- $_ := set $return "value" .Values.redisExternal.redisPortStringKey }}
+    {{- $_ := set $return "secretName" ( coalesce .Values.redisExternal.redisPortStringSecret (include "invenio.redis.secretName" . | trim)) }}
+  {{- else }}
+    {{- $_ := set $return "instance" "external" }}
+    {{- $_ := set $return "key" "redisPortString" }}
+    {{- $_ := set $return "value" ( toString "6379") }}
+    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "redis" "root" $root)) | trim) }}
+  {{- end }}
+{{- end -}}
+{{- toYaml $return }}
 {{- end -}}
 
 {{/*
@@ -215,14 +329,10 @@ valueFrom:
 {{- define "invenio.config.cache" -}}
 {{- $connectionString := ":$(INVENIO_CONFIG_REDIS_PASSWORD)@$(INVENIO_CONFIG_REDIS_HOST)" -}}
 {{- $connectionUrl := "$(INVENIO_CONFIG_REDIS_PROTOCOL)://:$(INVENIO_CONFIG_REDIS_PASSWORD)@$(INVENIO_CONFIG_REDIS_HOST):$(INVENIO_CONFIG_REDIS_PORT)" }}
-- name: INVENIO_CONFIG_REDIS_HOST
-  {{- (include "invenio.redis.hostname" . | trim) | nindent 2 }}
-- name: INVENIO_CONFIG_REDIS_PORT
-  {{- (include "invenio.redis.port" . | trim) | nindent 2 }}
-- name: INVENIO_CONFIG_REDIS_PROTOCOL
-  {{- (include "invenio.redis.protocol" . | trim) | nindent 2 }}
-- name: INVENIO_CONFIG_REDIS_PASSWORD
-  {{- (include "invenio.redis.password" . | trim) | nindent 2 }}
+{{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.redis.hostname" .) "envName" "INVENIO_CONFIG_REDIS_HOST") | trim | nindent 0 }}
+{{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.redis.password" .) "envName" "INVENIO_CONFIG_REDIS_PASSWORD") | trim | nindent 0 }}
+{{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.redis.port" .) "envName" "INVENIO_CONFIG_REDIS_PORT") | trim | nindent 0 }}
+{{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.redis.protocol" .) "envName" "INVENIO_CONFIG_REDIS_PROTOCOL") | trim | nindent 0 }}
 - name: INVENIO_ACCOUNTS_SESSION_REDIS_URL
   value: {{ printf "%s/1" $connectionUrl }}
 - name: INVENIO_CACHE_REDIS_HOST
@@ -245,60 +355,12 @@ valueFrom:
 - name: redis-config
   projected:
     sources:
-  {{- if .Values.redisExternal.uri }}
-    - secret:
-        name: {{ include "invenio.fullname" $root }}-invenio-redis-inline
-	items:
-	- key: uri
-	  path: INVENIO_BROKER_URL
-	- key: uri
-	  path: INVENIO_CELERY_BROKER_URL
-  {{- else if .Values.redisExternal.uriKey }}
-    - secret:
-        name: {{ coalesce .Values.redisExternal.uriSecret (include "invenio.redis.secretName" $root | trim) }} 
-        items:
-        - key: {{ .Values.redisExternal.uriKey }} 
-          path: INVENIO_BROKER_URL
-        - key: {{ .Values.redisExternal.uriKey }} 
-          path: INVENIO_CELERY_BROKER_URL
-  {{- else }}
     {{- range $item, $value := $fields }}
-    - secret:
-      {{- if hasKey $root.Values.redisExternal $item }}
-        name: {{ include "invenio.fullname" $root }}-invenio-redis-inline
-        items:
-        - key: {{ $item }}
-          path: {{ $value }}
-      {{- else }}
-        {{- $keyName := (printf "%sKey" $item) }}
-        {{- $secretName := (printf "%sSecret" $item) }}
-        name: {{ coalesce (get $root.Values.redisExternal $secretName) (include "invenio.redis.secretName" $root | trim) }}
-        items: 
-        - key: {{ get $root.Values.redisExternal $keyName }}
-          path: {{ $value | toString }}
-      {{- end }}
+      {{- $invenioHelper := (printf "%s%s" "invenio.redis." $item)  }}
+      {{- include "invenio.render.projectedSecret" (dict "myVal" (include $invenioHelper $root) "envName" $value) | trim | nindent 4 }}
     {{- end }}
-  {{- end }}
 {{- end }}
 
-
-
-
-
-
-
-#######################     Ingress TLS secret name     #######################
-{{/*
-  This template renders the name of the TLS secret used in
-  `Ingress.spec.tls.secretName`.
-*/}}
-{{- define "invenio.tlsSecretName" -}}
-  {{- if .Values.ingress.tlsSecretNameOverride }}
-    {{- tpl .Values.ingress.tlsSecretNameOverride $ }}
-  {{- else }}
-    {{- include "invenio.hostname" . -}}-tls
-  {{- end }}
-{{- end -}}
 
 #######################     RabbitMQ connection configuration     #######################
 {{/*
@@ -682,49 +744,6 @@ valueFrom:
 {{- end -}}
 
 #########################     PostgreSQL connection configuration     #########################
-
-{{/*
-  This template renders the envs for the PostgreSQL instance.
-  consumes 
-*/}}
-{{- define "invenio.svc.renderEnv" -}}
-{{- $root := . }}
-{{- $myVal := ( fromYaml .myVal) }}
-- name: {{ .envName }}
-  {{- if and (not (eq $myVal.instance "internalSecret")) (not (eq $myVal.instance "externalSecret")) }}
-  value: {{ printf "%s" (toString $myVal.value) }}
-  {{- else }}
-  valueFrom:
-    secretKeyRef:
-      name: {{ $myVal.secretName }}
-      key: {{ $myVal.value }}
-  {{- end -}}
-{{- end -}}
-
-
-
-{{/*
-  This template renders the projected secrets ofor the PostgreSQL instance.
-  consumes 
-*/}}
-{{- define "invenio.render.projectedSecret" -}}
-{{- $root := . }}
-{{- $myVal := ( fromYaml .myVal) }}
-{{- $envName := .envName }}
-{{- $myKey := "" }}
-{{- if or (eq $myVal.instance "internal") (eq $myVal.instance "external") }}
-{{- $myKey = $myVal.key }}
-{{- else }}
-{{- $myKey = $myVal.value }}
-{{- end }}
-- secret:
-    name: {{ $myVal.secretName }}
-    items:
-    - key: {{ $myKey }}
-      path: {{ $envName  }} 
-{{- end -}}
-
-
 
 
 {{/*

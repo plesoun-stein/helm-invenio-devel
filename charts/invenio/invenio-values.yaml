@@ -21,7 +21,7 @@ fullnameOverride: ""
 image:
   registry: apps.du.cesnet.cz
   repository: nr-repo-docs
-  tag: "0.9.6.7"  # Defaults to .Chart.appVersion
+  tag: "0.9.6.8"  # Defaults to .Chart.appVersion
   digest: ""
   ## Specify a imagePullPolicy
   ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'

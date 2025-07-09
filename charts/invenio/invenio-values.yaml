@@ -272,14 +272,14 @@ redisExternal:
 rabbitmq:
   enabled: false
 rabbitmqExternal: 
-  configFile: false
+  configFile: true
   existingSecret: "rabbitmq-cluster-example-default-user"
   usernameKey: "username"
   passwordKey: "password"
   amqpPortString: 5672
   managementPort: 15672
   hostnameKey: "host"
-  vhost: "/"
+  vhost: ""
   #  password: "hhhhhh"
   #  amqpPort: 5672
   #  managementPort: 15672

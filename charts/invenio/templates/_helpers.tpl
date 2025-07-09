@@ -310,8 +310,6 @@ valueFrom:
     {{- include "rabbitmq.secretPasswordName" .Subcharts.rabbitmq }}
   {{- else if and (not .Values.rabbitmq.enabled) .Values.rabbitmqExternal.existingSecret }}
     {{- required "Missing .Values.rabbitmqExternal.existingSecret" .Values.rabbitmqExternal.existingSecret }}
-  {{- else }}
-      {{- include "invenio.failingConfig" (dict "root" $root "key" "existingSecret" "service" "rabbitmq") }}
   {{- end }}
 {{- end -}}
 
@@ -322,14 +320,10 @@ valueFrom:
 {{- $root := . }}
 {{- $return := dict }}
 {{- if .Values.rabbitmq.enabled -}}
-  {{- if .Values.rabbitmq.auth.username }}
     {{- $_ := set $return "instance" "internal" }}
     {{- $_ := set $return "key" "username" }}
     {{- $_ := set $return "value" (required "Missing .values.rabbitmq.auth.username" (tpl .Values.rabbitmq.auth.username .)) }}
     {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "rabbitmq" "root" $root)) | trim) }}
-  {{- else }}
-    {{- include "invenio.failingConfig" (dict "root" $root "key" "username" "service" "rabbitmq") }} 
-  {{- end }}
 {{- else }}
   {{- if .Values.rabbitmqExternal.username }}
     {{- $_ := set $return "instance" "external" }}
@@ -369,7 +363,7 @@ valueFrom:
     {{- $_ := set $return "instance" "internalSecret" }}
     {{- $_ := set $return "key" "password" }}
     {{- $_ := set $return "value" "rabbitmq-password" -}}
-    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "rabbitmq" "root" $root)) | trim) }}
+    {{- $_ := set $return "secretName" ( include "rabbitmq.secretPasswordName" $root.Subcharts.rabbitmq | trim) }}
   {{- end }}
 {{- else }} 
   {{- if and .Values.rabbitmqExternal.password }}
@@ -430,18 +424,39 @@ valueFrom:
   This template renders the management port number for RabbitMQ.
 */}}
 {{- define "invenio.rabbitmq.managementPortString" -}}
-  {{- if .Values.rabbitmq.enabled }}
-{{- printf "value: %q" (required "Missing .Values.rabbitmq.service.ports.manager" (tpl .Values.rabbitmq.service.ports.manager .)) | nindent 0 }}
-  {{- else if and (not .Values.rabbitmq.enabled) .Values.rabbitmqExternal.managementPort }}
-{{- printf "value: %q" .Values.rabbitmqExternal.managementPort | nindent 0 }}
-  {{- else if and (not .Values.rabbitmq.enabled) .Values.rabbitmqExternal.managementPortKey }}
-valueFrom:
-  secretKeyRef:
-    name: {{ coalesce .Values.rabbitmqExternal.managementPortSecret (include "invenio.rabbitmq.secretName" . | trim) }}
-    key: {{ required "Missing .Values.rabbitmqExternal.managementPortKey" (tpl  .Values.rabbitmqExternal.managementPortKey .) }}
+{{- $root := . }}
+{{- $return := dict }}
+{{- if .Values.rabbitmq.enabled -}}
+  {{- if .Values.rabbitmq.service.ports.management }}
+    {{- $_ := set $return "instance" "internal" }}
+    {{- $_ := set $return "key" "managementPortString" }}
+    {{- $_ := set $return "value" .Values.rabbitmq.service.ports.management }}
+    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "rabbitmq" "root" $root)) | trim) }}
   {{- else }}
-{{- printf "value: 15672" | nindent 0 }}
-  {{- end -}}
+    {{- $_ := set $return "instance" "internal" }}
+    {{- $_ := set $return "key" "managementPortString" }}
+    {{- $_ := set $return "value" (toString "15672") }}
+    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "rabbitmq" "root" $root)) | trim) }}
+  {{- end }}
+{{- else }}
+  {{- if .Values.rabbitmqExternal.managementPortString }}
+    {{- $_ := set $return "instance" "external" }}
+    {{- $_ := set $return "key" "managementPortString" }}
+    {{- $_ := set $return "value" (tpl (toString .Values.rabbitmqExternal.managementPortString) . | toString) }}
+    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "rabbitmq" "root" $root)) | trim) }}
+  {{- else if .Values.rabbitmqExternal.managementPortStringKey }}
+    {{- $_ := set $return "instance" "externalSecret" }}
+    {{- $_ := set $return "key" "managementPortStringKey" }}
+    {{- $_ := set $return "value" .Values.rabbitmqExternal.managementPortStringKey }}
+    {{- $_ := set $return "secretName" ( coalesce .Values.rabbitmqExternal.managementPortStringSecret (include "invenio.rabbitmq.secretName" . | trim)) }}
+  {{- else }}
+    {{- $_ := set $return "instance" "external" }}
+    {{- $_ := set $return "key" "managementPortString" }}
+    {{- $_ := set $return "value" (toString "15672") }}
+    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "rabbitmq" "root" $root)) | trim) }}
+  {{- end }}
+{{- end -}}
+{{- toYaml $return }}
 {{- end -}}
 
 
@@ -478,46 +493,81 @@ valueFrom:
   This template renders the protocol for RabbitMQ.
 */}}
 {{- define "invenio.rabbitmq.protocol" -}}
-  {{- if .Values.rabbitmq.enabled }}
-{{- printf "value: amqp" | nindent 0 }}
-  {{- else if and (not .Values.rabbitmq.enabled) .Values.rabbitmqExternal.protocol }}
-{{- printf "value: %q" .Values.rabbitmqExternal.protocol | nindent 0 }}
+{{- $root := . }}
+{{- $return := dict }}
+{{- if .Values.rabbitmq.enabled -}}
+    {{- $_ := set $return "instance" "internal" }}
+    {{- $_ := set $return "key" "protocol" }}
+    {{- $_ := set $return "value" "amqp" }}
+    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "rabbitmq" "root" $root)) | trim) }}
+{{- else }}
+  {{- if .Values.rabbitmqExternal.protocol }}
+    {{- $_ := set $return "instance" "external" }}
+    {{- $_ := set $return "key" "protocol" }}
+    {{- $_ := set $return "value" (tpl (toString .Values.rabbitmqExternal.protocol) . | toString) }}
+    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "rabbitmq" "root" $root)) | trim) }}
+  {{- else if .Values.rabbitmqExternal.protocolKey }}
+    {{- $_ := set $return "instance" "externalSecret" }}
+    {{- $_ := set $return "key" "protocolKey" }}
+    {{- $_ := set $return "value" .Values.rabbitmqExternal.protocolKey }}
+    {{- $_ := set $return "secretName" ( coalesce .Values.rabbitmqExternal.protocolSecret (include "invenio.rabbitmq.secretName" . | trim)) }}
   {{- else }}
-valueFrom:
-  secretKeyRef:
-    name: {{ coalesce .Values.rabbitmqExternal.protocolSecret (include "invenio.rabbitmq.secretName" . | trim) }}
-    key: {{ required "Missing .Values.rabbitmqExternal.protocolKey" (tpl  .Values.rabbitmqExternal.protocolKey .) }}
-  {{- end -}}
+    {{- include "invenio.failingConfig" (dict "root" $root "key" "protocol" "service" "rabbitmq") }} 
+  {{- end }}
+{{- end -}}
+{{- toYaml $return }}
 {{- end -}}
 
 {{/*
   This template renders the vhost for RabbitMQ.
 */}}
 {{- define "invenio.rabbitmq.vhost" -}}
-  {{- if .Values.rabbitmq.enabled }}
-{{- printf "value: %q" "" | nindent 0 }}
-  {{- else if and (not .Values.rabbitmq.enabled) (hasKey .Values.rabbitmqExternal "vhost") }}
-{{- printf "value: %q" .Values.rabbitmqExternal.vhost | nindent 0 }}
+{{- $root := . }}
+{{- $return := dict }}
+{{- if .Values.rabbitmq.enabled -}}
+    {{- $_ := set $return "instance" "internal" }}
+    {{- $_ := set $return "key" "vhost" }}
+    {{- $_ := set $return "value" "/" }}
+    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "rabbitmq" "root" $root)) | trim) }}
+{{- else }}
+  {{- if .Values.rabbitmqExternal.vhost }}
+    {{- $_ := set $return "instance" "external" }}
+    {{- $_ := set $return "key" "vhost" }}
+    {{- $_ := set $return "value" (tpl (toString .Values.rabbitmqExternal.vhost) . | toString) }}
+    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "rabbitmq" "root" $root)) | trim) }}
+  {{- else if .Values.rabbitmqExternal.vhostKey }}
+    {{- $_ := set $return "instance" "externalSecret" }}
+    {{- $_ := set $return "key" "vhostKey" }}
+    {{- $_ := set $return "value" .Values.rabbitmqExternal.vhostKey }}
+    {{- $_ := set $return "secretName" ( coalesce .Values.rabbitmqExternal.vhostSecret (include "invenio.rabbitmq.secretName" . | trim)) }}
   {{- else }}
-valueFrom:
-  secretKeyRef:
-    name: {{ coalesce .Values.rabbitmqExternal.vhostSecret (include "invenio.rabbitmq.secretName" . | trim) }}
-    key: {{ required "Missing .Values.rabbitmqExternal.vhostKey" (tpl  .Values.rabbitmqExternal.vhostKey .) }}
-  {{- end -}}
+    {{- $_ := set $return "instance" "external" }}
+    {{- $_ := set $return "key" "vhost" }}
+    {{- $_ := set $return "value" "" }}
+    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "rabbitmq" "root" $root)) | trim) }}
+  {{- end }}
+{{- end -}}
+{{- toYaml $return }}
 {{- end -}}
 
 {{/*
   This template renders the whole URI into one string for RabbitMQ.
 */}}
 {{- define "invenio.rabbitmq.uri" -}}
-  {{- if and (not .Values.rabbitmq.enabled) .Values.rabbitmqExternal.uri }}
-{{- printf "value: %s" .Values.rabbitmqExternal.uri | nindent 0 }}
-  {{- else if and (not .Values.rabbitmq.enabled) .Values.rabbitmqExternal.uriKey }}
-valueFrom:
-  secretKeyRef:
-    name: {{ coalesce .Values.rabbitmqExternal.uriSecret (include "invenio.rabbitmq.secretName" . | trim) }}
-    key: {{ required "Missing .Values.rabbitmqExternal.uriKey" (tpl  .Values.rabbitmqExternal.uriKey .) }}
-  {{- end -}}
+{{- $root := . }}
+{{- $return := dict }}
+{{- if and (not .Values.rabbitmq.enabled) .Values.rabbitmqExternal.uri }}
+    {{- $_ := set $return "instance" "external" }}
+    {{- $_ := set $return "key" "uri" }}
+    {{- $_ := set $return "value" (tpl (toString .Values.rabbitmqExternal.uri) . | toString) }}
+    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "rabbitmq" "root" $root)) | trim) }}
+{{- else if and (not .Values.rabbitmq.enabled) .Values.rabbitmqExternal.uriKey }}
+    {{- $_ := set $return "instance" "externalSecret" }}
+    {{- $_ := set $return "key" "uriKey" }}
+    {{- $_ := set $return "value" .Values.rabbitmqExternal.uriKey }}
+    {{- $_ := set $return "secretName" ( coalesce .Values.rabbitmqExternal.uriSecret (include "invenio.rabbitmq.secretName" . | trim)) }}
+{{- end }}
+{{- toYaml $return }}
 {{- end -}}
 
 {{/*
@@ -530,10 +580,9 @@ valueFrom:
 {{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.rabbitmq.username" .) "envName" "INVENIO_AMQP_BROKER_USER") | trim | nindent 0 }}
 {{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.rabbitmq.hostname" .) "envName" "INVENIO_AMQP_BROKER_HOST") | trim | nindent 0 }}
 {{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.rabbitmq.password" .) "envName" "INVENIO_AMQP_BROKER_PASSWORD") | trim | nindent 0 }}
-- name: INVENIO_AMQP_BROKER_VHOST
-  {{- (include "invenio.rabbitmq.vhost" . | trim) | nindent 2 }}
-- name: INVENIO_AMQP_BROKER_PROTOCOL
-  {{- (include "invenio.rabbitmq.protocol" . | trim) | nindent 2 }}
+{{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.rabbitmq.vhost" .) "envName" "INVENIO_AMQP_BROKER_VHOST") | trim | nindent 0 }}
+{{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.rabbitmq.protocol" .) "envName" "INVENIO_AMQP_BROKER_PROTOCOL") | trim | nindent 0 }}
+{{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.rabbitmq.managementPortString" .) "envName" "INVENIO_AMQP_MGMT_PORT") | trim | nindent 0 }}
 - name: INVENIO_BROKER_URL
   value: {{ $uri }}
 - name: INVENIO_CELERY_BROKER_URL
@@ -541,10 +590,8 @@ valueFrom:
 - name: RABBITMQ_API_URI
   value: "http://$(INVENIO_AMQP_BROKER_USER):$(INVENIO_AMQP_BROKER_PASSWORD)@$(INVENIO_AMQP_BROKER_HOST):$(INVENIO_AMQP_BROKER_PORT)/api/"
 {{- else }}
-- name: INVENIO_BROKER_URL
-  {{- (include "invenio.rabbitmq.uri" . | trim) | nindent 2 }}
-- name: INVENIO_CELERY_BROKER_URL
-  {{- (include "invenio.rabbitmq.uri" . | trim) | nindent 2 }}
+{{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.rabbitmq.protocol" .) "envName" "INVENIO_BROKER_URL") | trim | nindent 0 }}
+{{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.rabbitmq.protocol" .) "envName" "INVENIO_CELERY_BROKER_URL") | trim | nindent 0 }}
 {{- end }}
 {{- end }}
 
@@ -559,6 +606,24 @@ valueFrom:
 */}}
 
 {{- define "invenio.rabbitmq.configFile" -}}
+{{- $fields := dict "username" "INVENIO_AMQP_BROKER_USER" "password" "INVENIO_AMQP_BROKER_PASSWORD" "hostname" "INVENIO_AMQP_BROKER_HOST" "amqpPortString" "INVENIO_AMQP_BROKER_PORT" "vhost" "INVENIO_AMQP_BROKER_VHOST" "protocol" "INVENIO_AMQP_BROKER_PROTOCOL" "managementPortString" "INVENIO_AMQP_MGMT_PORT" }}
+{{- $root := . }}
+- name: rabbitmq-config
+  projected:
+    sources:
+    {{- if and (not .Values.rabbitmq.enabled) (or .Values.rabbitmqExternal.uri .Values.rabbitmqExternal.uriKey) }}
+      {{- include "invenio.render.projectedSecret" (dict "myVal" (include "invenio.rabbitmq.uri" $root) "envName" "INVENIO_CELERY_BROKER_URL") | trim | nindent 4 }}
+      {{- include "invenio.render.projectedSecret" (dict "myVal" (include "invenio.rabbitmq.uri" $root) "envName" "INVENIO_BROKER_URL") | trim | nindent 4 }}
+    {{- else }}
+      {{- range $item, $value := $fields }}
+        {{- $invenioHelper := (printf "%s%s" "invenio.rabbitmq." $item)  }}
+        {{- include "invenio.render.projectedSecret" (dict "myVal" (include $invenioHelper $root) "envName" $value) | trim | nindent 4 }}
+      {{- end }}
+    {{- end }}
+{{- end }}
+
+
+{{/*
 {{- $fields := dict "username" "INVENIO_AMQP_BROKER_USER" "password" "INVENIO_AMQP_BROKER_PASSWORD" "hostname" "INVENIO_AMQP_BROKER_HOST" "amqpPort" "INVENIO_AMQP_BROKER_PORT" "vhost" "INVENIO_AMQP_BROKER_VHOST" "protocol" "INVENIO_AMQP_BROKER_PROTOCOL" }}
 {{- $root := . }}
 - name: rabbitmq-config
@@ -602,7 +667,7 @@ valueFrom:
     {{- end }}
   {{- end }}
 {{- end }}
-
+*/}}
 
 #########################     OpenSearch hostname     #########################
 {{/*

@@ -262,7 +262,7 @@ persistence:
 redis:
   enabled: false
 redisExternal:
-  configFile: false
+  configFile: true
   existingSecret: nr-repo-docs-test-invenio-backend-services-redis 
   hostname: "nr-repo-docs-test-redis-master"
   passwordKey: "redisPassword"
@@ -272,7 +272,7 @@ redisExternal:
 rabbitmq:
   enabled: false
 rabbitmqExternal: 
-  configFile: true
+  configFile: false
   existingSecret: "rabbitmq-cluster-example-default-user"
   usernameKey: "username"
   passwordKey: "password"
@@ -310,7 +310,11 @@ opensearch:
   enabled: false
 
 opensearchExternal:
-  hostname: "opensearch-cluster-master"
+  clientCert: true
+  existingSecret: test-stein-devel-prepsec-secrets-opensearch-invenio-user
+  hostname: "test-stein-devel-opensearch"
+  username: invenio
+  passwordKey: password
 logstash:
   enabled: false
 

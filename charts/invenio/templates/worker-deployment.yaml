@@ -76,6 +76,9 @@ spec:
         {{- if not .Values.redisExternal.configFile }}
         {{- include "invenio.config.cache" . | nindent 8 }}
         {{- end }}
+        {{- if not .Values.opensearchExternal.configFile }}
+        {{- (include "invenio.config.opensearch" . | trim) | nindent 8 }}
+        {{- end }}
         {{- with .Values.invenio.extraEnvVars }}
         {{- toYaml . | nindent 8 }}
         {{- end }}

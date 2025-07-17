@@ -40,6 +40,11 @@ stringData:
     if [ -d /mounted/extra ] ; then
     find /mounted/extra/ -maxdepth 1  -name "*.yaml" -exec cp {} /configs \;
     fi
+    if [ -v COPY_CERTS ]; then 
+      cp /mounted/extra/ca.crt /configs/client_ca.pem
+      cp /mounted/extra/tls.crt /configs/client_tls.pem
+      cp /mounted/extra/tls.key /configs/client_key.pem
+    fi
     # cp /mounted/uwsgi-config/uwsgi.ini /configs/
     # echo "some other stuff"
 

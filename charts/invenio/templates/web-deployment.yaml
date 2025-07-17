@@ -73,6 +73,9 @@ spec:
         {{- if not .Values.redisExternal.configFile }}
         {{- (include "invenio.config.cache" . | trim) | nindent 8 }}
         {{- end }}
+        {{- if not .Values.opensearchExternal.configFile }}
+        {{- (include "invenio.config.opensearch" . | trim) | nindent 8 }}
+        {{- end }}
         {{- with .Values.invenio.extraEnvVars }}
         {{-  toYaml . | nindent 8 }}
         {{- end }}
@@ -101,6 +104,10 @@ spec:
         readinessProbe: {{- tpl (.Values.web.readinessProbe | toYaml) $ | nindent 10 }}
         startupProbe: {{- tpl (.Values.web.startupProbe | toYaml) $ | nindent 10 }}
         volumeMounts:
+          {{- if .Values.invenio.extraConfigFiles }}
+          - name: extra-configfiles
+            mountPath: /mounted/extra
+          {{- end }}
           - name: copy-configdata
             mountPath: /mounted/scripts
           - name: config-files
@@ -212,6 +219,10 @@ spec:
         - name: copy-configfiles
           image: {{ default .Values.web.image (include "invenio.image" .) }}
           imagePullPolicy: {{ .Values.image.pullPolicy | quote }}
+          env:
+          {{- with .Values.invenio.extraEnvVars }}
+          {{-  toYaml . | nindent 10 }}
+          {{- end }}
           command: [
               "/bin/bash",
               "/mounted/scripts/copy.sh"

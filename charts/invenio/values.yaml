@@ -713,7 +713,7 @@ postgresqlExternal: {}
 opensearch:
   enabled: true
 
-externalOpensearch: {}
+opensearchExternal: {}
 
 logstash:
   enabled: false

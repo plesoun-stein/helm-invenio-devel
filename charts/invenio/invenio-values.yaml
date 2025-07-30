@@ -310,7 +310,7 @@ opensearch:
   enabled: false
 
 opensearchExternal:
-  clientCert: true
+  configFile: true
   existingSecret: test-stein-devel-prepsec-secrets-opensearch-invenio-user
   hostname: "test-stein-devel-opensearch"
   username: invenio

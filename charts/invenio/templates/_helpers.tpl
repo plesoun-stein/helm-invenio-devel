@@ -1062,7 +1062,7 @@ INVENIO_SEARCH_HOSTS: {{ printf "[{'host': '%s'}]" (include "invenio.opensearch.
 {{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.opensearch.caCerts" .) "envName" "INVENIO_CONFIG_OPENSEARCH_CA_CERTS") | trim | nindent 0 }}
 {{- end }}
 - name: INVENIO_SEARCH_HOSTS
-  value: {{ printf "%q" (printf "[{'host': $(INVENIO_CONFIG_OPENSEARCH_HOST)}]") }}
+  value: {{ printf "%q" (printf "[{\"host\": \"$(INVENIO_CONFIG_OPENSEARCH_HOST)\"}]") }}
 {{- if not .Values.opensearch.enabled }}
 - name: INVENIO_SEARCH_CLIENT_CONFIG
   value: {{ printf "%q" (printf "{\"use_ssl\": $(INVENIO_CONFIG_OPENSEARCH_USE_SSL), \"verify_certs\": $(INVENIO_CONFIG_OPENSEARCH_VERIFY_CERTS), \"ssl_assert_hostname\": $(INVENIO_CONFIG_OPENSEARCH_SSL_ASSERT_HOSTNAME), \"ssl_show_warn\": $(INVENIO_CONFIG_OPENSEARCH_SSL_SHOW_WARN), \"ca_certs\": \"$(INVENIO_CONFIG_OPENSEARCH_CA_CERTS)\", \"http_auth\": [\"$(INVENIO_CONFIG_OPENSEARCH_USER)\", \"$(INVENIO_CONFIG_OPENSEARCH_PASSWORD)\"]}") }}
@@ -1070,6 +1070,29 @@ INVENIO_SEARCH_HOSTS: {{ printf "[{'host': '%s'}]" (include "invenio.opensearch.
 {{- end }}
 
 
+{{/*
+  Define a projected volume for OpenSearch config file.
+
+  Usage:
+    {{ include "invenio.opensearch.configFile" . | nindent 6 }}
+
+  Expected context:
+    .Values.opensearchExternal.*
+*/}}
+
+{{- define "invenio.opensearch.configFile" -}}
+{{- $fields := dict "username" "INVENIO_CONFIG_OPENSEARCH_USER" "password" "INVENIO_CONFIG_OPENSEARCH_PASSWORD" "hostname" "INVENIO_CONFIG_OPENSEARCH_HOST" "port" "INVENIO_CONFIG_OPENSEARCH_PORT" "useSsl" "INVENIO_CONFIG_OPENSEARCH_USE_SSL" "protocol" "INVENIO_CONFIG_OPENSEARCH_PROTOCOL" "verifyCerts" "INVENIO_CONFIG_OPENSEARCH_VERIFY_CERTS" "sslAssertHostname" "INVENIO_CONFIG_OPENSEARCH_SSL_ASSERT_HOSTNAME" "sslShowWarn" "INVENIO_CONFIG_OPENSEARCH_SSL_SHOW_WARN" "caCerts" "INVENIO_CONFIG_OPENSEARCH_CA_CERTS" }}
+{{- $root := . }}
+- name: opensearch-config
+  projected:
+    sources:
+    {{- if not .Values.opensearch.enabled }}
+      {{- range $item, $value := $fields }}
+        {{- $invenioHelper := (printf "%s%s" "invenio.opensearch." $item)  }}
+        {{- include "invenio.render.projectedSecret" (dict "myVal" (include $invenioHelper $root) "envName" $value) | trim | nindent 4 }}
+      {{- end }}
+    {{- end }}
+{{- end }}
 
 #########################     PostgreSQL connection configuration     #########################
 

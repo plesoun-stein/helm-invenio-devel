@@ -151,6 +151,10 @@ spec:
           - name: redis-config
             mountPath: /mounted/redis
           {{- end }}
+          {{- if .Values.opensearchExternal.configFile }}
+          - name: opensearch-config
+            mountPath: /mounted/opensearch
+          {{- end }}
           {{- if .Values.invenio.extraConfigFiles }}
           - name: extra-configfiles
             mountPath: /mounted/extra
@@ -181,6 +185,9 @@ spec:
       {{- end }}
       {{- if .Values.redisExternal.configFile }}
       {{- include "invenio.redis.configFile" . | nindent 6 }}
+      {{- end }}
+      {{- if .Values.opensearchExternal.configFile }}
+      {{- include "invenio.opensearch.configFile" . | nindent 6 }}
       {{- end }}
 
       - name: var-run-celery

@@ -1,4 +1,4 @@
-{{/*
+a{/*
 Expand the name of the chart.
 */}}
 {{- define "invenio.name" -}}
@@ -122,10 +122,9 @@ params:
 {{- end }}
 
 
-###########################     Invenio env render     ###########################
+###########################     Invenio svc env renderer     ###########################
 {{/*
   This template renders the envs for the PostgreSQL instance.
-  consumes 
 */}}
 {{- define "invenio.svc.renderEnv" -}}
 {{- $root := . }}
@@ -144,7 +143,13 @@ params:
 ###########################     Invenio projected secret render     ###########################
 {{/*
   This template renders the projected secrets ofor the PostgreSQL instance.
-  consumes 
+  Parameters:
+  - `.myVal` (string): A YAML string containing the following keys:
+    - `instance` (string): Specifies whether the instance is "internal" or "external".
+    - `key` (string): The key to use when `instance` is "internal" or "external".
+    - `value` (string): The value to use when `instance` is neither "internal" nor "external".
+    - `secretName` (string): The name of the secret to be projected.
+  - `.envName` (string): The environment variable name where the secret value should be projected.
 */}}
 {{- define "invenio.render.projectedSecret" -}}
 {{- $root := . }}
@@ -369,7 +374,7 @@ params:
 {{- define "invenio.rabbitmq.secretName" -}}
 {{- $root := . }}
   {{- if .Values.rabbitmq.enabled }}
-    {{- include "rabbitmq.secretPasswordName" .Subcharts.rabbitmq }}
+    {{- required "Missing .Values.rabbitmq.auth.existingPasswordSecret" (tpl .Values.rabbitmq.auth.existingPasswordSecret .) -}}
   {{- else if and (not .Values.rabbitmq.enabled) .Values.rabbitmqExternal.existingSecret }}
     {{- required "Missing .Values.rabbitmqExternal.existingSecret" .Values.rabbitmqExternal.existingSecret }}
   {{- end }}
@@ -840,7 +845,7 @@ params:
 {{- if .Values.opensearch.enabled -}}
     {{- $_ := set $return "instance" "internal" }}
     {{- $_ := set $return "key" "protocol" }}
-    {{- $_ := set $return "value" "" }}
+    {{- $_ := set $return "value" "http" }}
     {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "opensearch" "root" $root)) | trim) }}
 {{- else }}
   {{- if .Values.opensearchExternal.protocol }}
@@ -1079,12 +1084,13 @@ INVENIO_SEARCH_HOSTS: {{ printf "[{'host': '%s'}]" (include "invenio.opensearch.
   Get the database cluster config secret name
 */}}
 {{- define "invenio.postgresql.secretName" -}}
-  {{- if .Values.postgresql.enabled -}}
-    {{- required "Missing .Values.postgresql.auth.existingSecret" (tpl .Values.postgresql.auth.existingSecret .) -}}
-  {{- else if and (not .Values.postgresql.enabled) .Values.postgresqlExternal.existingSecret -}}
-    {{- required "Missing .Values.postgresqlExternal.existingSecret" (tpl .Values.postgresqlExternal.existingSecret .) -}}
+{{- $root := . }}
+  {{- if $root.Values.postgresql.enabled -}}
+    {{- required "Missing .Values.postgresql.auth.existingSecret" (tpl $root.Values.postgresql.auth.existingSecret $root) -}}
+  {{- else if and (not .Values.postgresql.enabled) $root.Values.postgresqlExternal.existingSecret -}}
+    {{- required "Missing .Values.postgresqlExternal.existingSecret" (tpl $root.Values.postgresqlExternal.existingSecret $root) -}}
   {{- else }}
-    {{- fail (printf "\n\nthere is somthing wrong with postgresql congfiguration,\n\nI'm printing contexts.\n\npostgresql:%v\n\npostgresqlExternal:%v" (toYaml .Values.postgresql | nindent 2) (toYaml .Values.postgresqlExternal | nindent 2)) | indent 4 }}
+    {{- fail (printf "\n\nthere is somthing wrong with postgresql congfiguration,\n\nI'm printing contexts.\n\npostgresql:%v\n\npostgresqlExternal:%v" (toYaml $root.Values.postgresql | nindent 2) (toYaml $root.Values.postgresqlExternal | nindent 2)) | indent 4 }}
   {{- end -}}
 {{- end -}}
 
@@ -1094,26 +1100,26 @@ INVENIO_SEARCH_HOSTS: {{ printf "[{'host': '%s'}]" (include "invenio.opensearch.
 {{- define "invenio.postgresql.username" -}}
 {{- $root := . }}
 {{- $return := dict }}
-{{- if .Values.postgresql.enabled -}}
-  {{- if hasKey .Values.postgresql.auth "username" }}
+{{- if $root.Values.postgresql.enabled -}}
+  {{- if hasKey $root.Values.postgresql.auth "username" }}
     {{- $_ := set $return "instance" "internal" }}
     {{- $_ := set $return "key" "username" }}
-    {{- $_ := set $return "value" (required "Missing .values.postgresql.auth.username" (tpl .Values.postgresql.auth.username .)) }}
+    {{- $_ := set $return "value" (required "Missing .values.postgresql.auth.username" (tpl $root.Values.postgresql.auth.username $root)) }}
     {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "postgresql" "root" $root)) | trim) }}
   {{- else }}
     {{- include "invenio.failingConfig" (dict "root" $root "key" "username" "service" "postgresql") }} 
   {{- end }}
 {{- else }}
-  {{- if .Values.postgresqlExternal.username }}
+  {{- if $root.Values.postgresqlExternal.username }}
     {{- $_ := set $return "instance" "external" }}
     {{- $_ := set $return "key" "username" }}
-    {{- $_ := set $return "value" .Values.postgresqlExternal.username }}
+    {{- $_ := set $return "value" $root.Values.postgresqlExternal.username }}
     {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "postgresql" "root" $root)) | trim) }}
-  {{- else if .Values.postgresqlExternal.usernameKey }}
+  {{- else if $root.Values.postgresqlExternal.usernameKey }}
     {{- $_ := set $return "instance" "externalSecret" }}
     {{- $_ := set $return "key" "usernameKey" }}
-    {{- $_ := set $return "value" .Values.postgresqlExternal.usernameKey }}
-    {{- $_ := set $return "secretName" ( coalesce .Values.postgresqlExternal.usernameSecret (include "invenio.postgresql.secretName" . | trim)) }}
+    {{- $_ := set $return "value" $root.Values.postgresqlExternal.usernameKey }}
+    {{- $_ := set $return "secretName" ( coalesce $root.Values.postgresqlExternal.usernameSecret (include "invenio.postgresql.secretName" . | trim)) }}
   {{- else }}
     {{- include "invenio.failingConfig" (dict "root" $root "key" "username" "service" "postgresql") }} 
   {{- end }}
@@ -1127,26 +1133,24 @@ INVENIO_SEARCH_HOSTS: {{ printf "[{'host': '%s'}]" (include "invenio.opensearch.
 {{- define "invenio.postgresql.hostname" -}}
 {{- $root := . }}
 {{- $return := dict }}
-{{- if .Values.postgresql.enabled -}}
-  {{- if .Values.postgresql.hostname }}
+{{- if $root.Values.postgresql.enabled -}}
+  {{- if $root.Values.postgresql.hostname }}
     {{- $_ := set $return "instance" "internal" }}
     {{- $_ := set $return "key" "hostname" }}
-    {{- $_ := set $return "value" (required "Missing .Values.postgresql.hostname" (tpl .Values.postgresql.hostname .)) }}
+    {{- $_ := set $return "value" (include "postgresql.v1.primary.fullname" .Subcharts.postgresql | trim) }}
     {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "postgresql" "root" $root)) | trim) }}
-  {{- else }}
-    {{- include "invenio.failingConfig" (dict "root" $root "key" "hostname" "service" "postgresql") }} 
   {{- end }}
 {{- else }}
-  {{- if .Values.postgresqlExternal.hostname }}
+  {{- if $root.Values.postgresqlExternal.hostname }}
     {{- $_ := set $return "instance" "external" }}
     {{- $_ := set $return "key" "hostname" }}
     {{- $_ := set $return "value" "hostname" }}
     {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "postgresql" "root" $root)) | trim) }}
-  {{- else if .Values.postgresqlExternal.hostnameKey }}
+  {{- else if $root.Values.postgresqlExternal.hostnameKey }}
     {{- $_ := set $return "instance" "externalSecret" }}
     {{- $_ := set $return "key" "hostnameKey" }}
-    {{- $_ := set $return "value" .Values.postgresqlExternal.hostnameKey }}
-    {{- $_ := set $return "secretName" ( coalesce .Values.postgresqlExternal.hostnameSecret (include "invenio.postgresql.secretName" . | trim)) }}
+    {{- $_ := set $return "value" $root.Values.postgresqlExternal.hostnameKey }}
+    {{- $_ := set $return "secretName" ( coalesce $root.Values.postgresqlExternal.hostnameSecret (include "invenio.postgresql.secretName" . | trim)) }}
   {{- else }}
     {{- include "invenio.failingConfig" (dict "root" $root "key" "hostname" "service" "postgresql") }} 
   {{- end }}
@@ -1161,22 +1165,29 @@ INVENIO_SEARCH_HOSTS: {{ printf "[{'host': '%s'}]" (include "invenio.opensearch.
 {{- define "invenio.postgresql.password" -}}
 {{- $root := . }}
 {{- $return := dict }}
-{{- if .Values.postgresql.enabled }} 
+{{- if $root.Values.postgresql.enabled }} 
+  {{- if $root.Values.postgresql.auth.password }}
     {{- $_ := set $return "instance" "internal" }}
     {{- $_ := set $return "key" "password" }}
-    {{- $_ := set $return "value" (required "Missing .Values.postgresql.auth.password" (tpl .Values.postgresql.auth.password .)) }}
+    {{- $_ := set $return "value" (required "Missing .Values.postgresql.auth.password" (tpl $root.Values.postgresql.auth.password .)) }}
     {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "postgresql" "root" $root)) | trim) }}
+  {{- else }}
+    {{- $_ := set $return "instance" "internalSecret" }}
+    {{- $_ := set $return "key" "passwordKey" }}
+    {{- $_ := set $return "value" (required "Missing .Values.postgresql.auth.existingSecret" (tpl $root.Values.postgresql.auth.existingSecret .)) }}
+    {{- $_ := set $return "secretName" (required "Missing .Values.postgresql.auth.secretKeys.userPasswordKey" (tpl $root.Values.postgresql.auth.secretKeys.userPasswordKey .)) }}
+  {{- end }}
 {{- else }} 
-  {{- if and .Values.postgresqlExternal.password }}
+  {{- if and $root.Values.postgresqlExternal.password }}
     {{- $_ := set $return "instance" "external" }}
     {{- $_ := set $return "key" "password" }}
-    {{- $_ := set $return "value" .Values.postgresqlExternal.password }}
+    {{- $_ := set $return "value" $root.Values.postgresqlExternal.password }}
     {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "postgresql" "root" $root)) | trim) }}
-  {{- else if .Values.postgresqlExternal.passwordKey }}
+  {{- else if $root.Values.postgresqlExternal.passwordKey }}
     {{- $_ := set $return "instance" "externalSecret" }}
     {{- $_ := set $return "key" "passwordKey" }}
-    {{- $_ := set $return "value" .Values.postgresqlExternal.passwordKey }}
-    {{- $_ := set $return "secretName" ( coalesce .Values.postgresqlExternal.passwordSecret (include "invenio.postgresql.secretName" . | trim)) }}
+    {{- $_ := set $return "value" $root.Values.postgresqlExternal.passwordKey }}
+    {{- $_ := set $return "secretName" ( coalesce $root.Values.postgresqlExternal.passwordSecret (include "invenio.postgresql.secretName" . | trim)) }}
   {{- else }}
     {{- include "invenio.failingConfig" (dict "root" $root "key" "password" "service" "postgresql") }} 
   {{- end -}}
@@ -1190,22 +1201,22 @@ INVENIO_SEARCH_HOSTS: {{ printf "[{'host': '%s'}]" (include "invenio.opensearch.
 {{- define "invenio.postgresql.portString" -}}
 {{- $root := . }}
 {{- $return := dict }}
-{{- if .Values.postgresql.enabled -}}
+{{- if $root.Values.postgresql.enabled -}}
     {{- $_ := set $return "instance" "internal" }}
     {{- $_ := set $return "key" "portString" }}
-    {{- $_ := set $return "value" (required "Missing .Values.postgresql.primary.service.ports.postgresql" (tpl (toString .Values.postgresql.primary.service.ports.postgresql) .)) }}
+    {{- $_ := set $return "value" (required "Missing .Values.postgresql.primary.service.ports.postgresql" (tpl (toString $root.Values.postgresql.primary.service.ports.postgresql) .)) }}
     {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "postgresql" "root" $root)) | trim) }}
 {{- else }}
-  {{- if .Values.postgresqlExternal.portString }}
+  {{- if $root.Values.postgresqlExternal.portString }}
     {{- $_ := set $return "instance" "external" }}
     {{- $_ := set $return "key" "portString" }}
-    {{- $_ := set $return "value" (tpl (toString .Values.postgresqlExternal.portString) . | toString) }}
+    {{- $_ := set $return "value" (tpl (toString $root.Values.postgresqlExternal.portString) . | toString) }}
     {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "postgresql" "root" $root)) | trim) }}
-  {{- else if .Values.postgresqlExternal.portStringKey }}
+  {{- else if $root.Values.postgresqlExternal.portStringKey }}
     {{- $_ := set $return "instance" "externalSecret" }}
     {{- $_ := set $return "key" "portStringKey" }}
-    {{- $_ := set $return "value" .Values.postgresqlExternal.portStringKey }}
-    {{- $_ := set $return "secretName" ( coalesce .Values.postgresqlExternal.portStringSecret (include "invenio.postgresql.secretName" . | trim)) }}
+    {{- $_ := set $return "value" $root.Values.postgresqlExternal.portStringKey }}
+    {{- $_ := set $return "secretName" ( coalesce $root.Values.postgresqlExternal.portStringSecret (include "invenio.postgresql.secretName" . | trim)) }}
   {{- else }}
     {{- include "invenio.failingConfig" (dict "root" $root "key" "portString" "service" "postgresql") }} 
   {{- end }}
@@ -1219,22 +1230,22 @@ INVENIO_SEARCH_HOSTS: {{ printf "[{'host': '%s'}]" (include "invenio.opensearch.
 {{- define "invenio.postgresql.database" -}}
 {{- $root := . }}
 {{- $return := dict }}
-{{- if .Values.postgresql.enabled -}}
+{{- if $root.Values.postgresql.enabled -}}
     {{- $_ := set $return "instance" "internal" }}
     {{- $_ := set $return "key" "database" }}
-    {{- $_ := set $return "value" (required "Missing .Values.postgresql.auth.database" (tpl .Values.postgresql.auth.database .)) }}
+    {{- $_ := set $return "value" (required "Missing .Values.postgresql.auth.database" (tpl $root.Values.postgresql.auth.database .)) }}
     {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "postgresql" "root" $root)) | trim) }}
 {{- else }}
-  {{- if .Values.postgresqlExternal.database }}
+  {{- if $root.Values.postgresqlExternal.database }}
     {{- $_ := set $return "instance" "external" }}
     {{- $_ := set $return "key" "database" }}
-    {{- $_ := set $return "value" .Values.postgresqlExternal.database }}
+    {{- $_ := set $return "value" $root.Values.postgresqlExternal.database }}
     {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "postgresql" "root" $root)) | trim) }}
-  {{- else if .Values.postgresqlExternal.databaseKey }}
+  {{- else if $root.Values.postgresqlExternal.databaseKey }}
     {{- $_ := set $return "instance" "externalSecret" }}
     {{- $_ := set $return "key" "databaseKey" }}
-    {{- $_ := set $return "value" .Values.postgresqlExternal.databaseKey }}
-    {{- $_ := set $return "secretName" ( coalesce .Values.postgresqlExternal.databaseSecret (include "invenio.postgresql.secretName" . | trim)) }}
+    {{- $_ := set $return "value" $root.Values.postgresqlExternal.databaseKey }}
+    {{- $_ := set $return "secretName" ( coalesce $root.Values.postgresqlExternal.databaseSecret (include "invenio.postgresql.secretName" . | trim)) }}
   {{- else }}
     {{- include "invenio.failingConfig" (dict "root" $root "key" "database" "service" "postgresql") }} 
   {{- end }}
@@ -1248,29 +1259,22 @@ INVENIO_SEARCH_HOSTS: {{ printf "[{'host': '%s'}]" (include "invenio.opensearch.
 {{- define "invenio.postgresql.protocol" -}}
 {{- $root := . }}
 {{- $return := dict }}
-{{- if .Values.postgresql.enabled -}}
-  {{- if .Values.postgresql.protocol }}
-    {{- $_ := set $return "instance" "internal" }}
-    {{- $_ := set $return "key" "protocol" }}
-    {{- $_ := set $return "value" (tpl .Values.postgresql.protocol .) }}
-    {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "postgresql" "root" $root)) | trim) }}
-  {{- else }}
+{{- if $root.Values.postgresql.enabled -}}
     {{- $_ := set $return "instance" "internal" }}
     {{- $_ := set $return "key" "protocol" }}
     {{- $_ := set $return "value" "postgresql+psycopg2"}}
     {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "postgresql" "root" $root)) | trim) }}
-  {{- end }}
 {{- else }}
-  {{- if .Values.postgresqlExternal.protocol }}
+  {{- if $root.Values.postgresqlExternal.protocol }}
     {{- $_ := set $return "instance" "external" }}
     {{- $_ := set $return "key" "protocol" }}
-    {{- $_ := set $return "value" (tpl (toString .Values.postgresqlExternal.protocol) . | toString) }}
+    {{- $_ := set $return "value" (tpl (toString $root.Values.postgresqlExternal.protocol) . | toString) }}
     {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "postgresql" "root" $root)) | trim) }}
-  {{- else if .Values.postgresqlExternal.protocolKey }}
+  {{- else if $root.Values.postgresqlExternal.protocolKey }}
     {{- $_ := set $return "instance" "externalSecret" }}
     {{- $_ := set $return "key" "protocolKey" }}
-    {{- $_ := set $return "value" .Values.postgresqlExternal.protocolKey }}
-    {{- $_ := set $return "secretName" ( coalesce .Values.postgresqlExternal.protocolSecret (include "invenio.postgresql.secretName" . | trim)) }}
+    {{- $_ := set $return "value" $root.Values.postgresqlExternal.protocolKey }}
+    {{- $_ := set $return "secretName" ( coalesce $root.Values.postgresqlExternal.protocolSecret (include "invenio.postgresql.secretName" . | trim)) }}
   {{- else }}
     {{- $_ := set $return "instance" "external" }}
     {{- $_ := set $return "key" "protocol" }}
@@ -1287,16 +1291,16 @@ INVENIO_SEARCH_HOSTS: {{ printf "[{'host': '%s'}]" (include "invenio.opensearch.
 {{- define "invenio.postgresql.uri" -}}
 {{- $root := . }}
 {{- $return := dict }}
-  {{- if and (not .Values.postgresql.enabled) .Values.postgresqlExternal.uri }}
+  {{- if and (not $root.Values.postgresql.enabled) $root.Values.postgresqlExternal.uri }}
     {{- $_ := set $return "instance" "external" }}
     {{- $_ := set $return "key" "uri" }}
-    {{- $_ := set $return "value" (tpl (toString .Values.postgresqlExternal.uri) . | toString) }}
+    {{- $_ := set $return "value" (tpl (toString $root.Values.postgresqlExternal.uri) . | toString) }}
     {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "postgresql" "root" $root)) | trim) }}
-  {{- else if and (not .Values.postgresql.enabled) .Values.postgresqlExternal.uriKey }}
+  {{- else if and (not $root.Values.postgresql.enabled) $root.Values.postgresqlExternal.uriKey }}
     {{- $_ := set $return "instance" "externalSecret" }}
     {{- $_ := set $return "key" "uriKey" }}
-    {{- $_ := set $return "value" .Values.postgresqlExternal.uriKey }}
-    {{- $_ := set $return "secretName" ( coalesce .Values.postgresqlExternal.protocolSecret (include "invenio.postgresql.secretName" . | trim)) }}
+    {{- $_ := set $return "value" $root.Values.postgresqlExternal.uriKey }}
+    {{- $_ := set $return "secretName" ( coalesce $root.Values.postgresqlExternal.protocolSecret (include "invenio.postgresql.secretName" . | trim)) }}
   {{- end -}}
 {{- toYaml $return }}
 {{- end -}}
@@ -1338,7 +1342,7 @@ INVENIO_SEARCH_HOSTS: {{ printf "[{'host': '%s'}]" (include "invenio.opensearch.
 - name: postgresql-config
   projected:
     sources:
-    {{- if and (not .Values.postgresql.enabled) (or .Values.postgresqlExternal.uri .Values.postgresqlExternal.uriKey) }}
+    {{- if and (not $root.Values.postgresql.enabled) (or $root.Values.postgresqlExternal.uri $root.Values.postgresqlExternal.uriKey) }}
       {{- include "invenio.render.projectedSecret" (dict "myVal" (include "invenio.postgresql.uri" $root) "envName" "INVENIO_SQLALCHEMY_DATABASE_URI") | trim | nindent 4 }}
     {{- else }}
       {{- range $item, $value := $fields }}
@@ -1348,6 +1352,7 @@ INVENIO_SEARCH_HOSTS: {{ printf "[{'host': '%s'}]" (include "invenio.opensearch.
     {{- end }}
 {{- end }}
 
+#########################     Sentry configuration     #########################
 
 {{/*
 Get the sentry secret name
@@ -1374,7 +1379,9 @@ Add sentry environmental variables
       key: {{ .Values.invenio.sentry.secretKeys.dsnKey }}
 {{- end }}
 {{- end -}}
+#########################     Basic configuration     #########################
 
+
 {{/*
 Invenio basic configuration variables
 */}}
@@ -1401,6 +1408,8 @@ invenio.ExtraConfig will overwrite the values from configBase in case of duplica
 {{- $dst | toYaml -}}
 {{- end -}}
 
+#########################     Invenio General Secret     #########################
+
 {{/*
 Get the invenio general secret name
 */}}
@@ -1412,8 +1421,10 @@ Get the invenio general secret name
 {{- end -}}
 {{- end -}}
 
+#########################     Datacite configuration     #########################
+
 {{/*
-Get the sentry secret name
+Get the datacite secret name
 */}}
 {{- define "invenio.dataciteSecretName" -}}
 {{- if .Values.invenio.datacite.existingSecret -}}

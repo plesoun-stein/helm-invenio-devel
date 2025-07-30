@@ -1048,7 +1048,7 @@ INVENIO_SEARCH_HOSTS: {{ printf "[{'host': '%s'}]" (include "invenio.opensearch.
 */}}
 {{- define "invenio.config.opensearch" -}}
 {{- if .Values.opensearch.enabled }}
-INVENIO_SEARCH_HOSTS: {{ printf "[{'host': '%s'}]" (include "invenio.opensearch.hostname" .) | quote }}
+{{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.opensearch.hostname" .) "envName" "INVENIO_CONFIG_OPENSEARCH_HOST") | trim | nindent 0 }}
 {{- else }}
 {{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.opensearch.username" .) "envName" "INVENIO_CONFIG_OPENSEARCH_USER") | trim | nindent 0 }}
 {{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.opensearch.hostname" .) "envName" "INVENIO_CONFIG_OPENSEARCH_HOST") | trim | nindent 0 }}
@@ -1060,18 +1060,12 @@ INVENIO_SEARCH_HOSTS: {{ printf "[{'host': '%s'}]" (include "invenio.opensearch.
 {{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.opensearch.sslAssertHostname" .) "envName" "INVENIO_CONFIG_OPENSEARCH_SSL_ASSERT_HOSTNAME") | trim | nindent 0 }}
 {{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.opensearch.sslShowWarn" .) "envName" "INVENIO_CONFIG_OPENSEARCH_SSL_SHOW_WARN") | trim | nindent 0 }}
 {{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.opensearch.caCerts" .) "envName" "INVENIO_CONFIG_OPENSEARCH_CA_CERTS") | trim | nindent 0 }}
-{{- $hostname := get (include "invenio.opensearch.hostname" . | fromYaml) "value" }} 
-{{- $httpAuth := "" }}
-{{- if .Values.opensearchExternal.clientCert }}
-{{- $httpAuth = printf "\"client_cert\": \"/configs/client_tls.pem\", \"client_key\": \"/configs/client_key.pem\"" }}
-{{- else }}
-{{- $httpAuth = printf "\"http_auth\": [\"$(INVENIO_CONFIG_OPENSEARCH_USER)\", \"$(INVENIO_CONFIG_OPENSEARCH_PASSWORD)\"]" }}
 {{- end }}
 - name: INVENIO_SEARCH_HOSTS
-  value: {{ printf "%q" (printf "[{'host': '%s'}]" $hostname) }}
+  value: {{ printf "%q" (printf "[{'host': $(INVENIO_CONFIG_OPENSEARCH_HOST)}]") }}
+{{- if not .Values.opensearch.enabled }}
 - name: INVENIO_SEARCH_CLIENT_CONFIG
-  value: {{ printf "%q" (printf "{\"use_ssl\": $(INVENIO_CONFIG_OPENSEARCH_USE_SSL), \"verify_certs\": $(INVENIO_CONFIG_OPENSEARCH_VERIFY_CERTS), \"ssl_assert_hostname\": $(INVENIO_CONFIG_OPENSEARCH_SSL_ASSERT_HOSTNAME), \"ssl_show_warn\": $(INVENIO_CONFIG_OPENSEARCH_SSL_SHOW_WARN), \"ca_certs\": \"$(INVENIO_CONFIG_OPENSEARCH_CA_CERTS)\", %s}" $httpAuth ) }}
-
+  value: {{ printf "%q" (printf "{\"use_ssl\": $(INVENIO_CONFIG_OPENSEARCH_USE_SSL), \"verify_certs\": $(INVENIO_CONFIG_OPENSEARCH_VERIFY_CERTS), \"ssl_assert_hostname\": $(INVENIO_CONFIG_OPENSEARCH_SSL_ASSERT_HOSTNAME), \"ssl_show_warn\": $(INVENIO_CONFIG_OPENSEARCH_SSL_SHOW_WARN), \"ca_certs\": \"$(INVENIO_CONFIG_OPENSEARCH_CA_CERTS)\", \"http_auth\": [\"$(INVENIO_CONFIG_OPENSEARCH_USER)\", \"$(INVENIO_CONFIG_OPENSEARCH_PASSWORD)\"]}") }}
 {{- end }}
 {{- end }}
 

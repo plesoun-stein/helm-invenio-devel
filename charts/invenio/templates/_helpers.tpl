@@ -354,8 +354,15 @@ params:
   value: {{ printf "%s/4" $connectionUrl }}
 {{- end -}}
 
-{{- define "invenio.redis.configFile" -}}
+
+{{- define "invenio.redis.fields" }}
 {{- $fields := dict "password" "INVENIO_CONFIG_REDIS_PASSWORD" "hostname" "INVENIO_CONFIG_REDIS_HOST" "portString" "INVENIO_CONFIG_REDIS_PORT" "protocol" "INVENIO_CONFIG_REDIS_PROTOCOL" }}
+{{- toJson $fields }}
+{{- end }}
+
+
+{{- define "invenio.redis.configFile" -}}
+{{- $fields := fromJson (include "invenio.redis.fields" . | trim) }}
 {{- $root := . }}
 - name: redis-config
   projected:
@@ -871,7 +878,7 @@ params:
 {{/*
   This template renders the port for Opensearch.
 */}}
-{{- define "invenio.opensearch.port" -}}
+{{- define "invenio.opensearch.portString" -}}
 {{- $root := . }}
 {{- $return := dict }}
 {{- if .Values.opensearch.enabled -}}
@@ -1054,7 +1061,7 @@ INVENIO_SEARCH_HOSTS: {{ printf "[{'host': '%s'}]" (include "invenio.opensearch.
 {{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.opensearch.hostname" .) "envName" "INVENIO_CONFIG_OPENSEARCH_HOST") | trim | nindent 0 }}
 {{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.opensearch.password" .) "envName" "INVENIO_CONFIG_OPENSEARCH_PASSWORD") | trim | nindent 0 }}
 {{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.opensearch.protocol" .) "envName" "INVENIO_CONFIG_OPENSEARCH_PROTOCOL") | trim | nindent 0 }}
-{{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.opensearch.port" .) "envName" "INVENIO_CONFIG_OPENSEARCH_PORT") | trim | nindent 0 }}
+{{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.opensearch.portString" .) "envName" "INVENIO_CONFIG_OPENSEARCH_PORT") | trim | nindent 0 }}
 {{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.opensearch.useSsl" .) "envName" "INVENIO_CONFIG_OPENSEARCH_USE_SSL") | trim | nindent 0 }}
 {{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.opensearch.verifyCerts" .) "envName" "INVENIO_CONFIG_OPENSEARCH_VERIFY_CERTS") | trim | nindent 0 }}
 {{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.opensearch.sslAssertHostname" .) "envName" "INVENIO_CONFIG_OPENSEARCH_SSL_ASSERT_HOSTNAME") | trim | nindent 0 }}
@@ -1080,8 +1087,15 @@ INVENIO_SEARCH_HOSTS: {{ printf "[{'host': '%s'}]" (include "invenio.opensearch.
     .Values.opensearchExternal.*
 */}}
 
+{{- define "invenio.opensearch.fields" }}
+{{- $fields := dict "username" "INVENIO_CONFIG_OPENSEARCH_USER" "password" "INVENIO_CONFIG_OPENSEARCH_PASSWORD" "hostname" "INVENIO_CONFIG_OPENSEARCH_HOST" "portString" "INVENIO_CONFIG_OPENSEARCH_PORT" "useSsl" "INVENIO_CONFIG_OPENSEARCH_USE_SSL" "protocol" "INVENIO_CONFIG_OPENSEARCH_PROTOCOL" "verifyCerts" "INVENIO_CONFIG_OPENSEARCH_VERIFY_CERTS" "sslAssertHostname" "INVENIO_CONFIG_OPENSEARCH_SSL_ASSERT_HOSTNAME" "sslShowWarn" "INVENIO_CONFIG_OPENSEARCH_SSL_SHOW_WARN" "caCerts" "INVENIO_CONFIG_OPENSEARCH_CA_CERTS" }}
+{{- toJson $fields }}
+{{- end }}
+
+
+
 {{- define "invenio.opensearch.configFile" -}}
-{{- $fields := dict "username" "INVENIO_CONFIG_OPENSEARCH_USER" "password" "INVENIO_CONFIG_OPENSEARCH_PASSWORD" "hostname" "INVENIO_CONFIG_OPENSEARCH_HOST" "port" "INVENIO_CONFIG_OPENSEARCH_PORT" "useSsl" "INVENIO_CONFIG_OPENSEARCH_USE_SSL" "protocol" "INVENIO_CONFIG_OPENSEARCH_PROTOCOL" "verifyCerts" "INVENIO_CONFIG_OPENSEARCH_VERIFY_CERTS" "sslAssertHostname" "INVENIO_CONFIG_OPENSEARCH_SSL_ASSERT_HOSTNAME" "sslShowWarn" "INVENIO_CONFIG_OPENSEARCH_SSL_SHOW_WARN" "caCerts" "INVENIO_CONFIG_OPENSEARCH_CA_CERTS" }}
+{{- $fields := fromJson (include "invenio.opensearch.fields" . | trim ) }}
 {{- $root := . }}
 - name: opensearch-config
   projected:
@@ -1343,6 +1357,14 @@ INVENIO_SEARCH_HOSTS: {{ printf "[{'host': '%s'}]" (include "invenio.opensearch.
 {{- end -}}
 
 
+
+{{- define "invenio.postgresql.fields" }}
+{{- $fields := dict "username" "INVENIO_DB_USER" "password" "INVENIO_DB_PASSWORD" "hostname" "INVENIO_DB_HOST" "portString" "INVENIO_DB_PORT" "database" "INVENIO_DB_NAME" "protocol" "INVENIO_DB_PROTOCOL" }}
+{{- toJson $fields }}
+{{- end }}
+
+
+
 {{/*
   Define a projected volume for PostgreSQL config file.
 
@@ -1354,7 +1376,7 @@ INVENIO_SEARCH_HOSTS: {{ printf "[{'host': '%s'}]" (include "invenio.opensearch.
 */}}
 
 {{- define "invenio.postgresql.configFile" -}}
-{{- $fields := dict "username" "INVENIO_DB_USER" "password" "INVENIO_DB_PASSWORD" "hostname" "INVENIO_DB_HOST" "portString" "INVENIO_DB_PORT" "database" "INVENIO_DB_NAME" "protocol" "INVENIO_DB_PROTOCOL" }}
+{{- $fields := fromJson (include "invenio.postgresql.fields" . | trim) }}
 {{- $root := . }}
 - name: postgresql-config
   projected:

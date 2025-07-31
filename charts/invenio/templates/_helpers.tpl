@@ -304,23 +304,23 @@ params:
 {{- $return := dict }}
 {{- if .Values.redis.enabled -}}
     {{- $_ := set $return "instance" "internal" }}
-    {{- $_ := set $return "key" "redisPortString" }}
+    {{- $_ := set $return "key" "portString" }}
     {{- $_ := set $return "value" ( toString "6379") }}
     {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "redis" "root" $root)) | trim) }}
 {{- else }}
-  {{- if .Values.redisExternal.redisPortString }}
+  {{- if .Values.redisExternal.portString }}
     {{- $_ := set $return "instance" "external" }}
-    {{- $_ := set $return "key" "redisPortString" }}
-    {{- $_ := set $return "value" (tpl (toString .Values.redisExternal.redisPortString) . | toString) }}
+    {{- $_ := set $return "key" "portString" }}
+    {{- $_ := set $return "value" (tpl (toString .Values.redisExternal.portString) . | toString) }}
     {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "redis" "root" $root)) | trim) }}
-  {{- else if .Values.redisExternal.redisPortStringKey }}
+  {{- else if .Values.redisExternal.portStringKey }}
     {{- $_ := set $return "instance" "externalSecret" }}
-    {{- $_ := set $return "key" "redisPortStringKey" }}
-    {{- $_ := set $return "value" .Values.redisExternal.redisPortStringKey }}
-    {{- $_ := set $return "secretName" ( coalesce .Values.redisExternal.redisPortStringSecret (include "invenio.redis.secretName" . | trim)) }}
+    {{- $_ := set $return "key" "portStringKey" }}
+    {{- $_ := set $return "value" .Values.redisExternal.portStringKey }}
+    {{- $_ := set $return "secretName" ( coalesce .Values.redisExternal.portStringSecret (include "invenio.redis.secretName" . | trim)) }}
   {{- else }}
     {{- $_ := set $return "instance" "external" }}
-    {{- $_ := set $return "key" "redisPortString" }}
+    {{- $_ := set $return "key" "portString" }}
     {{- $_ := set $return "value" ( toString "6379") }}
     {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "redis" "root" $root)) | trim) }}
   {{- end }}

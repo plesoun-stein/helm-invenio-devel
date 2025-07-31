@@ -883,23 +883,23 @@ params:
 {{- $return := dict }}
 {{- if .Values.opensearch.enabled -}}
     {{- $_ := set $return "instance" "internal" }}
-    {{- $_ := set $return "key" "port" }}
+    {{- $_ := set $return "key" "portString" }}
     {{- $_ := set $return "value" "9200" }}
     {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "opensearch" "root" $root)) | trim) }}
 {{- else }}
-  {{- if .Values.opensearchExternal.port }}
+  {{- if .Values.opensearchExternal.portString }}
     {{- $_ := set $return "instance" "external" }}
-    {{- $_ := set $return "key" "port" }}
-    {{- $_ := set $return "value" (tpl (toString .Values.opensearchExternal.port) . | toString) }}
+    {{- $_ := set $return "key" "portString" }}
+    {{- $_ := set $return "value" (tpl (toString .Values.opensearchExternal.portString) . | toString) }}
     {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "opensearch" "root" $root)) | trim) }}
-  {{- else if .Values.opensearchExternal.portKey }}
+  {{- else if .Values.opensearchExternal.portStringKey }}
     {{- $_ := set $return "instance" "externalSecret" }}
-    {{- $_ := set $return "key" "portKey" }}
-    {{- $_ := set $return "value" .Values.opensearchExternal.portKey }}
+    {{- $_ := set $return "key" "portStringKey" }}
+    {{- $_ := set $return "value" .Values.opensearchExternal.portStringKey }}
     {{- $_ := set $return "secretName" ( coalesce .Values.opensearchExternal.portSecret (include "invenio.opensearch.secretName" . | trim)) }}
   {{- else }}
     {{- $_ := set $return "instance" "external" }}
-    {{- $_ := set $return "key" "port" }}
+    {{- $_ := set $return "key" "portString" }}
     {{- $_ := set $return "value" ("9200" | toString) }}
     {{- $_ := set $return "secretName" ((include "invenio.inline.secretName" (dict "myName" "opensearch" "root" $root)) | trim) }}
   {{- end }}

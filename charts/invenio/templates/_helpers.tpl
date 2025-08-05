@@ -183,6 +183,11 @@ params:
 
 ############################     Redis Hostname     ############################
 
+{{- define "invenio.redis.fields" }}
+{{- $fields := dict "password" "INVENIO_CONFIG_REDIS_PASSWORD" "hostname" "INVENIO_CONFIG_REDIS_HOST" "portString" "INVENIO_CONFIG_REDIS_PORT" "protocol" "INVENIO_CONFIG_REDIS_PROTOCOL" }}
+{{- toYaml $fields }}
+{{- end }}
+
 {{/*
   This template renders the name of the default secret that stores info about RabbitMQ.
 */}}
@@ -354,15 +359,8 @@ params:
   value: {{ printf "%s/4" $connectionUrl }}
 {{- end -}}
 
-
-{{- define "invenio.redis.fields" }}
-{{- $fields := dict "password" "INVENIO_CONFIG_REDIS_PASSWORD" "hostname" "INVENIO_CONFIG_REDIS_HOST" "portString" "INVENIO_CONFIG_REDIS_PORT" "protocol" "INVENIO_CONFIG_REDIS_PROTOCOL" }}
-{{- toJson $fields }}
-{{- end }}
-
-
 {{- define "invenio.redis.configFile" -}}
-{{- $fields := fromJson (include "invenio.redis.fields" . | trim) }}
+{{- $fields := fromYaml (include "invenio.redis.fields" . | trim) }}
 {{- $root := . }}
 - name: redis-config
   projected:
@@ -375,6 +373,12 @@ params:
 
 
 #######################     RabbitMQ connection configuration     #######################
+
+{{- define "invenio.rabbitmq.fields" }}
+{{- $fields := dict "username" "INVENIO_AMQP_BROKER_USER" "password" "INVENIO_AMQP_BROKER_PASSWORD" "hostname" "INVENIO_AMQP_BROKER_HOST" "amqpPortString" "INVENIO_AMQP_BROKER_PORT" "vhost" "INVENIO_AMQP_BROKER_VHOST" "protocol" "INVENIO_AMQP_BROKER_PROTOCOL" "managementPortString" "INVENIO_AMQP_MGMT_PORT" }}
+{{- toYaml $fields }}
+{{- end }}
+
 {{/*
   This template renders the name of the default secret that stores info about RabbitMQ.
 */}}
@@ -662,10 +666,10 @@ params:
 - name: INVENIO_CELERY_BROKER_URL
   value: $(INVENIO_BROKER_URL)
 - name: RABBITMQ_API_URI
-  value: "http://$(INVENIO_AMQP_BROKER_USER):$(INVENIO_AMQP_BROKER_PASSWORD)@$(INVENIO_AMQP_BROKER_HOST):$(INVENIO_AMQP_BROKER_PORT)/api/"
+  value: "http://$(INVENIO_AMQP_BROKER_USER):$(INVENIO_AMQP_BROKER_PASSWORD)@$(INVENIO_AMQP_BROKER_HOST):$(INVENIO_AMQP_MGMT_PORT)/api/"
 {{- else }}
-{{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.rabbitmq.protocol" .) "envName" "INVENIO_BROKER_URL") | trim | nindent 0 }}
-{{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.rabbitmq.protocol" .) "envName" "INVENIO_CELERY_BROKER_URL") | trim | nindent 0 }}
+{{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.rabbitmq.uri" .) "envName" "INVENIO_BROKER_URL") | trim | nindent 0 }}
+{{- include "invenio.svc.renderEnv" (dict "myVal" (include "invenio.rabbitmq.uri" .) "envName" "INVENIO_CELERY_BROKER_URL") | trim | nindent 0 }}
 {{- end }}
 {{- end }}
 
@@ -1089,13 +1093,13 @@ INVENIO_SEARCH_HOSTS: {{ printf "[{'host': '%s'}]" (include "invenio.opensearch.
 
 {{- define "invenio.opensearch.fields" }}
 {{- $fields := dict "username" "INVENIO_CONFIG_OPENSEARCH_USER" "password" "INVENIO_CONFIG_OPENSEARCH_PASSWORD" "hostname" "INVENIO_CONFIG_OPENSEARCH_HOST" "portString" "INVENIO_CONFIG_OPENSEARCH_PORT" "useSsl" "INVENIO_CONFIG_OPENSEARCH_USE_SSL" "protocol" "INVENIO_CONFIG_OPENSEARCH_PROTOCOL" "verifyCerts" "INVENIO_CONFIG_OPENSEARCH_VERIFY_CERTS" "sslAssertHostname" "INVENIO_CONFIG_OPENSEARCH_SSL_ASSERT_HOSTNAME" "sslShowWarn" "INVENIO_CONFIG_OPENSEARCH_SSL_SHOW_WARN" "caCerts" "INVENIO_CONFIG_OPENSEARCH_CA_CERTS" }}
-{{- toJson $fields }}
+{{- toYaml $fields }}
 {{- end }}
 
 
 
 {{- define "invenio.opensearch.configFile" -}}
-{{- $fields := fromJson (include "invenio.opensearch.fields" . | trim ) }}
+{{- $fields := fromYaml (include "invenio.opensearch.fields" . | trim ) }}
 {{- $root := . }}
 - name: opensearch-config
   projected:
@@ -1360,7 +1364,7 @@ INVENIO_SEARCH_HOSTS: {{ printf "[{'host': '%s'}]" (include "invenio.opensearch.
 
 {{- define "invenio.postgresql.fields" }}
 {{- $fields := dict "username" "INVENIO_DB_USER" "password" "INVENIO_DB_PASSWORD" "hostname" "INVENIO_DB_HOST" "portString" "INVENIO_DB_PORT" "database" "INVENIO_DB_NAME" "protocol" "INVENIO_DB_PROTOCOL" }}
-{{- toJson $fields }}
+{{- toYaml $fields }}
 {{- end }}
 
 
@@ -1376,7 +1380,7 @@ INVENIO_SEARCH_HOSTS: {{ printf "[{'host': '%s'}]" (include "invenio.opensearch.
 */}}
 
 {{- define "invenio.postgresql.configFile" -}}
-{{- $fields := fromJson (include "invenio.postgresql.fields" . | trim) }}
+{{- $fields := fromYaml (include "invenio.postgresql.fields" . | trim) }}
 {{- $root := . }}
 - name: postgresql-config
   projected:

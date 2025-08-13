@@ -361,6 +361,27 @@ Return the proper Invenio image name
   value: "$(INVENIO_DB_PROTOCOL)://$(INVENIO_DB_USER):$(INVENIO_DB_PASSWORD)@$(INVENIO_DB_HOST):$(INVENIO_DB_PORT)/$(INVENIO_DB_NAME)"
 {{- end -}}
 
+
+{{- define "invenio.config.configFiles" }}
+
+- name: backend-services
+  projected:
+    sources:
+      - secret: 
+          name: {{ include "invenio.fullname" . }}-copy-configfiles
+      - secret:
+          name: backend-config
+      {{- if or (and .Values.postgresql.enabled (not .Values.postgresql.auth.password)) (and (not .Values.postgresql.enabled) (not .Values.postgresqlExternal.password)) }}
+      - secret:
+          name: {{ ternary .Values.postgresql.auth.existingSecret .Values.postgresqlExternal.existingSecret .Values.postgresql.enabled }}
+          items:
+          - key: {{ ternary .Values.postgresql.auth.secretKeys.userPasswordKey .Values.postgresqlExternal.existingSecretPasswordKey .Values.postgresql.enabled }}
+            path: {{ ternary .Values.postgresql.auth.secretKeys.userPasswordKey .Values.postgresqlExternal.existingSecretPasswordKey .Values.postgresql.enabled }}
+      {{- end }}
+{{- end }}
+
+
+
 {{/*
 Get the sentry secret name
 */}}

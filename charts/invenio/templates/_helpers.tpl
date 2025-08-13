@@ -361,7 +361,6 @@ Return the proper Invenio image name
   value: "$(INVENIO_DB_PROTOCOL)://$(INVENIO_DB_USER):$(INVENIO_DB_PASSWORD)@$(INVENIO_DB_HOST):$(INVENIO_DB_PORT)/$(INVENIO_DB_NAME)"
 {{- end -}}
 
-
 {{- define "invenio.config.configFiles" }}
 
 - name: backend-services
@@ -371,16 +370,21 @@ Return the proper Invenio image name
           name: {{ include "invenio.fullname" . }}-copy-configfiles
       - secret:
           name: backend-config
-      {{- if or (and .Values.postgresql.enabled (not .Values.postgresql.auth.password)) (and (not .Values.postgresql.enabled) (not .Values.postgresqlExternal.password)) }}
+      {{- if not (ternary .Values.postgresql.auth.password .Values.postgresqlExternal.password .Values.postgresql.enabled) }}
       - secret:
-          name: {{ ternary .Values.postgresql.auth.existingSecret .Values.postgresqlExternal.existingSecret .Values.postgresql.enabled }}
+          name: {{ include "invenio.postgresql.secretName" . | trim }}
           items:
-          - key: {{ ternary .Values.postgresql.auth.secretKeys.userPasswordKey .Values.postgresqlExternal.existingSecretPasswordKey .Values.postgresql.enabled }}
-            path: {{ ternary .Values.postgresql.auth.secretKeys.userPasswordKey .Values.postgresqlExternal.existingSecretPasswordKey .Values.postgresql.enabled }}
+          - key: {{ include "invenio.postgresql.secretKey" . | trim }}
+            path: {{ include "invenio.postgresql.secretKey" . | trim }}
+      {{- end }}
+      {{- if not (ternary .Values.rabbitmq.auth.password .Values.rabbitmqExternal.password .Values.rabbitmq.enabled) }}
+      - secret:
+          name: {{ include "invenio.rabbitmq.secretName" . | trim }}
+          items:
+          - key: {{  include "invenio.rabbitmq.secretKey" . | trim }}
+            path: {{  include "invenio.rabbitmq.secretKey" . | trim }}
       {{- end }}
 {{- end }}
-
-
 
 {{/*
 Get the sentry secret name

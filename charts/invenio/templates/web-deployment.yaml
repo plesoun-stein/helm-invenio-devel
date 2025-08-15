@@ -58,7 +58,7 @@ spec:
         command: [
             "/bin/bash",
             "-c",
-            "uwsgi --ini /opt/invenio/src/uwsgi/uwsgi.ini",
+            "bash /mounted/copy.sh && uwsgi --ini /opt/invenio/src/uwsgi/uwsgi.ini",
         ]
         resources: {{- toYaml .Values.web.resources | nindent 10 }}
         envFrom:
@@ -77,6 +77,7 @@ spec:
           value: {{ required "Missing .Values.global.timezone" .Values.global.timezone }}
         {{- include "invenio.config.queue" . | nindent 8 }}
         {{- include "invenio.config.database" . | nindent 8 }}
+        {{- include "invenio.config.cache" . | nindent 8 }}
         {{- with .Values.invenio.extraEnvVars }}
         {{-  toYaml . | nindent 8 }}
         {{- end }}
@@ -128,6 +129,12 @@ spec:
           {{- end }}
           {{- range .Values.web.extraVolumeMounts }}
           - {{ toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if or .Values.postgresql.configFile .Values.postgresqlExternal.configFile }}
+          - name: backend-services
+            mountPath: {{ .Values.invenio.mountedDir }}
+          - name: rendered-configs
+            mountPath: {{.Values.invenio.configDir }}
           {{- end }}
         securityContext:
           {{- with .Values.web.securityContext }}
@@ -269,6 +276,11 @@ spec:
           name: {{ include "invenio.fullname" . }}-uwsgi-config
       - name: nginx-invenio-assets
         emptyDir: {}
+      {{- if or .Values.postgresql.configFile .Values.postgresqlExternal.configFile }}
+      - name: rendered-configs
+        emptyDir: {}
+      {{- include "invenio.config.configFiles" . | trim | nindent 6 }}
+      {{- end }}
       {{- if .Values.persistence.enabled }}
       - name: shared-volume
         persistentVolumeClaim:

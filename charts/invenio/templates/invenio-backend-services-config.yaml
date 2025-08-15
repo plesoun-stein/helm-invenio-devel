@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "invenio.fullname" . }}-backend-config 
+  namespace: {{ .Release.Namespace }}
+type: Opaque
+stringData:
+  dummy: value
+  {{- if or .Values.postgresql.configFile .Values.postgresqlExternal.configFile  }}
+  INVENIO_DB_USER: {{ (include "invenio.postgresql.username" .  | trim) }}
+  INVENIO_DB_HOST: {{ (include "invenio.postgresql.hostname" .  | trim) }}
+  INVENIO_DB_PORT: {{ (include "invenio.postgresql.portString" .  | trim) }}
+  INVENIO_DB_NAME: {{ (include "invenio.postgresql.database" .  | trim) }} 
+  INVENIO_DB_PROTOCOL: "postgresql+psycopg2"
+  {{- if or (and .Values.postgresql.enabled .Values.postgresql.auth.password) (and (not .Values.postgresql.enabled) .Values.postgresqlExternal.password) }}
+  INVENIO_DB_PASSWORD: {{ (include "invenio.postgresql.password" .  | trim)  | quote }}
+  {{- end }}
+  {{- end }}
+
+  {{- if or .Values.rabbitmq.configFile .Values.rabbitmqExternal.configFile  }}
+  INVENIO_AMQP_BROKER_USER: {{ (include "invenio.rabbitmq.username" .  | trim) }}
+  INVENIO_AMQP_BROKER_HOST: {{ (include "invenio.rabbitmq.hostname" .  | trim) }}
+  INVENIO_AMQP_BROKER_PORT: {{ (include "invenio.rabbitmq.amqpPortString" .  | trim) }}
+  INVENIO_AMQP_BROKER_VHOST: {{ (include "invenio.rabbitmq.vhost" .  | trim) | default "/" }} 
+  INVENIO_AMQP_BROKER_PROTOCOL: {{ (include "invenio.rabbitmq.protocol" .  | trim) }} 
+  {{- if  ternary .Values.rabbitmq.auth.password .Values.rabbitmqExternal.password .Values.rabbitmq.enabled  }}
+  INVENIO_AMQP_BROKER_PASSWORD: {{ (include "invenio.rabbitmq.password" .  | trim) }}
+  {{- end }}
+  {{- end }}
+  
+  {{- if or .Values.redis.configFile .Values.redisExternal.configFile  }}
+  INVENIO_CONFIG_REDIS_HOST: {{ include "invenio.redis.hostname" . | trim }}
+  INVENIO_CONFIG_REDIS_PORT: {{ include "invenio.redis.portString" . | trim }}
+  INVENIO_CONFIG_REDIS_PROTOCOL: {{ include "invenio.redis.protocol" . | trim }}
+  {{- if and .Values.redis.enabled (not .Values.redis.auth.enabled) }}
+  INVENIO_CONFIG_REDIS_PASSWORD: "\"\"" 
+  {{- else if  ternary .Values.redis.auth.password .Values.redisExternal.password .Values.redis.enabled  }}
+  INVENIO_CONFIG_REDIS_PASSWORD: {{ include "invenio.redis.password" . | trim}}
+  {{- end }}
+  {{- end }}
+

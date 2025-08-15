@@ -1,3 +1,5 @@
 .deploy
 .idea
 /charts/*/charts/
+**poznamky**
+**.swp

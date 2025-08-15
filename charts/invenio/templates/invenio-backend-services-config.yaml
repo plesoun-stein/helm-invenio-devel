@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Secret
 metadata:
-  name: backend-config 
+  name: {{ include "invenio.fullname" . }}-backend-config 
   namespace: {{ .Release.Namespace }}
 type: Opaque
 stringData:
@@ -27,3 +27,15 @@ stringData:
   INVENIO_AMQP_BROKER_PASSWORD: {{ (include "invenio.rabbitmq.password" .  | trim) }}
   {{- end }}
   {{- end }}
+  
+  {{- if or .Values.redis.configFile .Values.redisExternal.configFile  }}
+  INVENIO_CONFIG_REDIS_HOST: {{ include "invenio.redis.hostname" . | trim }}
+  INVENIO_CONFIG_REDIS_PORT: {{ include "invenio.redis.portString" . | trim }}
+  INVENIO_CONFIG_REDIS_PROTOCOL: {{ include "invenio.redis.protocol" . | trim }}
+  {{- if and .Values.redis.enabled (not .Values.redis.auth.enabled) }}
+  INVENIO_CONFIG_REDIS_PASSWORD: "\"\"" 
+  {{- else if  ternary .Values.redis.auth.password .Values.redisExternal.password .Values.redis.enabled  }}
+  INVENIO_CONFIG_REDIS_PASSWORD: {{ include "invenio.redis.password" . | trim}}
+  {{- end }}
+  {{- end }}
+

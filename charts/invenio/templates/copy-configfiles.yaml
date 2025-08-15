@@ -41,3 +41,23 @@ stringData:
     {{ printf "INVENIO_AMQP_BROKER_PROTOCOL=$(cat INVENIO_AMQP_BROKER_PROTOCOL)" }}
     {{ printf "echo INVENIO_CELERY_BROKER_URL: \\\"${INVENIO_AMQP_BROKER_PROTOCOL}://${INVENIO_AMQP_BROKER_USER}:${INVENIO_AMQP_BROKER_PASSWORD}@${INVENIO_AMQP_BROKER_HOST}:${INVENIO_AMQP_BROKER_PORT}/${INVENIO_AMQP_BROKER_VHOST}\\\" >  %s/INVENIO_CELERY_BROKER_URL.yaml" $rendered }}
     {{ printf "echo INVENIO_BROKER_URL: \\\"${INVENIO_AMQP_BROKER_PROTOCOL}://${INVENIO_AMQP_BROKER_USER}:${INVENIO_AMQP_BROKER_PASSWORD}@${INVENIO_AMQP_BROKER_HOST}:${INVENIO_AMQP_BROKER_PORT}/${INVENIO_AMQP_BROKER_VHOST}\\\" >  %s/INVENIO_BROKER_URL.yaml" $rendered }}
+    # redis settings
+    {{- if  ternary .Values.redis.auth.password .Values.redisExternal.password .Values.redis.enabled  }}
+    # redis password from values
+    {{ printf "INVENIO_CONFIG_REDIS_PASSWORD=$(cat INVENIO_CONFIG_REDIS_PASSWORD)" }}
+    {{- else }}
+    # redis password from secret
+    {{ printf "INVENIO_CONFIG_REDIS_PASSWORD=$(cat %s)" (include "invenio.redis.secretKey" .  | trim) }}
+    {{- end }}
+    {{ printf "INVENIO_CONFIG_REDIS_HOST=$(cat INVENIO_CONFIG_REDIS_HOST)" }}
+    {{ printf "INVENIO_CONFIG_REDIS_PORT=$(cat INVENIO_CONFIG_REDIS_PORT)" }}
+    {{ printf "INVENIO_CONFIG_REDIS_PROTOCOL=$(cat INVENIO_CONFIG_REDIS_PROTOCOL)" }}
+    {{- $uri := "${INVENIO_CONFIG_REDIS_PROTOCOL}://:${INVENIO_CONFIG_REDIS_PASSWORD}@${INVENIO_CONFIG_REDIS_HOST}:${INVENIO_CONFIG_REDIS_PORT}" }}
+    {{- $hostString := ":${INVENIO_CONFIG_REDIS_PASSWORD}@${INVENIO_CONFIG_REDIS_HOST}" }}
+    {{ printf "echo INVENIO_CACHE_REDIS_HOST: \"%s\" > %s/INVENIO_CACHE_REDIS_HOST.yaml" $hostString $rendered }}
+    {{ printf "echo INVENIO_CACHE_REDIS_URL: \"%s/0\" > %s/INVENIO_CACHE_REDIS_URL.yaml" $uri $rendered }}
+    {{ printf "echo INVENIO_IIIF_CACHE_REDIS_URL: \"%s/0\" > %s/INVENIO_IIIF_CACHE_REDIS_URL.yaml" $uri $rendered }}
+    {{ printf "echo INVENIO_ACCOUNTS_SESSION_REDIS_URL: \"%s/1\" > %s/INVENIO_ACCOUNTS_SESSION_REDIS_URL.yaml" $uri $rendered }}
+    {{ printf "echo INVENIO_CELERY_RESULT_BACKEND: \"%s/2\" > %s/INVENIO_CELERY_RESULT_BACKEND.yaml" $uri $rendered }}
+    {{ printf "echo INVENIO_RATELIMIT_STORAGE_URI: \"%s/3\" > %s/INVENIO_RATELIMIT_STORAGE_URI.yaml" $uri $rendered }}
+    {{ printf "echo INVENIO_COMMUNITIES_IDENTITIES_CACHE_REDIS_URL: \"%s/4\" > %s/INVENIO_COMMUNITIES_IDENTITIES_CACHE_REDIS_URL.yaml" $uri $rendered }}

@@ -49,9 +49,12 @@ route:
   annotations: {}
 
 invenio:
+  aaa: bbb
+  configDir: /configs
+  mountedDir: /mounted
   ## @param invenio.hostname Invenio hostname (templated) used in configuration varibales like APP_ALLOWED_HOSTS, SITE_HOSTNAME or SITE_URL
   ##
-  hostname: ""
+  hostname: "vyvoj.test.kub1.du.cesnet.cz"
   ## @param invenio.secret_key DEPRECATED: this is automatically generated now, or set by custom secret using invenio.existingSecret
   ##
   secret_key: ""
@@ -70,6 +73,18 @@ invenio:
   ## ref: https://inveniordm.docs.cern.ch/customize/authentication/#security
   ##
   existingSecret: ""
+  extraSecrets:
+  - secret: 
+      name: nr-repo-docs-test-prepsec-secrets-invenio-mail
+      items: 
+      - key: mail.yaml
+        path: mail.yaml
+  # - secret:
+  #     name: anysecretname 
+  #     items:
+  #     - key: anykey 
+  #       path: anypath
+
   init: false
   default_users: []  # Requires invenio.init=true
   demo_data: false  # Setting invenio.demo_data=true requires also setting default_users!
@@ -136,6 +151,8 @@ invenio:
     ## @param invenio.datacite.secret_name DEPRECATED: use invenio.datacite.existingSecret instead
     ##
     secret_name: ""
+  podSecurityContext:
+    enabled: true
   remote_apps:
     enabled: false
     existing_secret: false
@@ -153,7 +170,9 @@ invenio:
   extra_env_from_secret: []
   ## @param invenio.extraEnvVars Extra environment variables to be added to all the pods.
   ##
-  extraEnvVars: []
+  extraEnvVars:
+    - name: RELOAD_DEPL
+      value: "001"
   uwsgiExtraConfig: {}
   ## @param invenio.extraEnvFrom Extra secretRef or configMapRef for the `envFrom` field in all Invenio containers (templated).
   ##
@@ -230,11 +249,11 @@ nginx:
 web:
   image: ""  # DEPRECATED: Use `.Values.image` instead!
   imagePullSecret: ""  # DEPRECATED: Use `.Values.image.imagePullSecrets` instead!
-  replicas: 6
+  replicas: 1
   terminationGracePeriodSeconds: 60
   uwsgi:
-    processes: 6
-    threads: 4
+    processes: 2
+    threads: 2
   ## @param web.extraEnvVars Extra environment variables to be added to the pods.
   ##
   extraEnvVars: []
@@ -250,7 +269,7 @@ web:
       command:
         - /bin/bash
         - -c
-        - "uwsgi_curl -X HEAD -H 'Host: {{ include \"invenio.hostname\" $ }}' $(hostname):5000 /ping"
+        - "uwsgi_curl -X HEAD -H 'Host: {{ include \"invenio.hostname\" $ }}' 127.0.0.1:5000 /ping"
     failureThreshold: 3
     initialDelaySeconds: 5
     periodSeconds: 5
@@ -263,7 +282,7 @@ web:
       command:
         - /bin/bash
         - -c
-        - "uwsgi_curl -X HEAD -H 'Host: {{ include \"invenio.hostname\" $ }}' $(hostname):5000 /ping"
+        - "uwsgi_curl -X HEAD -H 'Host: {{ include \"invenio.hostname\" $ }}' 127.0.0.1:5000 /ping"
     failureThreshold: 3
     initialDelaySeconds: 10
     periodSeconds: 5
@@ -390,7 +409,7 @@ worker:
   app: invenio_app.celery
   concurrency: 2
   log_level: INFO
-  replicas: 2
+  replicas: 1
   run_mount_path: /var/run/celery
   celery_pidfile: /var/run/celery/celerybeat.pid
   celery_schedule: /var/run/celery/celery-schedule
@@ -702,7 +721,7 @@ terminal:
     strategy: null
 
 persistence:
-  enabled: true
+  enabled: false
   name: "shared-volume"
   access_mode: ReadWriteMany
   annotations: {}
@@ -711,30 +730,33 @@ persistence:
   useExistingClaim: false
 
 redis:
+  configFile: true
   enabled: true
   auth:
-    enabled: false  # Dangerous! This lets Invenio connect to Redis unauthenticated!
-    password: ""
-    # existingSecret:
-    # existingSecretPasswordKey:
+    enabled: true  # Dangerous! This lets Invenio connect to Redis unauthenticated!
+      #password: bbbbccbcbcbcbcaaaa
+    existingSecretPasswordKey: redisPassword
+    existingSecret: test-stein-devel-prepsec-secrets-redis
   master:
     disableCommands: []  # Dangerous! This lets us run the `FLUSHALL` and `FLUSHDB` commands! Unfortunately, they are required by the wipe_recreate.sh script when installing Invenio.
   replica:
     disableCommands: []  # Dangerous! This lets us run the `FLUSHALL` and `FLUSHDB` commands! Unfortunately, they are required by the wipe_recreate.sh script when installing Invenio.
 
-redisExternal: {}
-  # hostname:
+redisExternal:
+  hostname: aaaa 
   # password:
-  # existingSecret:
-  # existingSecretPasswordKey:
+  existingSecret: bbb
+  existingSecretPasswordKey: ccc
 
 ## RabbitMQ chart configuration
 ## ref: https://github.com/bitnami/charts/blob/main/bitnami/rabbitmq/values.yaml
 rabbitmq:
+  configFile: true
   enabled: true
   auth:
     password: ""
-
+    existingPasswordSecret: "test-stein-devel-prepsec-secrets-rabbitmq"
+    existingSecretPasswordKey: "rabbitmqPassword"
 ## External RabbitMQ configuration
 ## All of these values are only used when rabbitmq.enabled is set to false
 ## @param rabbitmqExternal.username RabbitMQ user
@@ -786,14 +808,6 @@ flower:
     #     name: foo
     # - configMapRef:
     #     name: bar
-  ## @param flower.podSecurityContext securityContext for the flower pod
-  ##
-  podSecurityContext:
-    runAsNonRoot: true
-    runAsUser: 1000
-    runAsGroup: 1000
-    seccompProfile:
-      type: "RuntimeDefault"
   ## @param flower.nodeSelector Node labels for flower pods assignment
   ## Ref: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/
   ##
@@ -839,12 +853,16 @@ flower:
 ## @param postgresql.auth.database Name for a custom database to create
 ##
 postgresql:
+  configFile: true
   enabled: true
   auth:
     username: invenio
-    password: ""
+      #password: "aaaa"
     database: invenio
-    existingSecret: ""
+    existingSecret: "test-stein-devel-prepsec-secrets-postgres"
+    secretKeys:
+      adminPasswordKey: "postgresqlPassword"
+      userPasswordKey: "postgresqlPassword"
 
 ## External PostgreSQL configuration
 ## All of these values are only used when postgresql.enabled is set to false

@@ -55,7 +55,7 @@ spec:
         command: [
           "/bin/bash",
           "-c",
-          "celery -A {{ .Values.worker.app }} beat -l {{ .Values.worker.log_level }} -s {{ .Values.worker.celery_schedule }} --pidfile {{ .Values.worker.celery_pidfile }}"
+          "bash /mounted/copy.sh && celery -A {{ .Values.worker.app }} beat -l {{ .Values.worker.log_level }} -s {{ .Values.worker.celery_schedule }} --pidfile {{ .Values.worker.celery_pidfile }}"
         ]
         securityContext:
           {{- with .Values.workerBeat.securityContext }}
@@ -73,6 +73,10 @@ spec:
           mountPath: "/opt/invenio/var/instance/app_data/vocabularies/{{ $key }}"
           subPath: "{{ $key }}"
         {{- end }}
+        - name: mounted-secrets 
+          mountPath: {{ .Values.invenio.mountedDir }}
+        - name: rendered-configs
+          mountPath: {{.Values.invenio.configDir }}
         envFrom:
         - configMapRef:
             name: {{ include "invenio.fullname" . }}-config
@@ -114,6 +118,9 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
       volumes:
+      {{- include "invenio.config.configFiles" . | trim | nindent 6 }}
+      - name: rendered-configs
+        emptyDir: {}
       - name: var-run-celery
         emptyDir:
           medium: Memory

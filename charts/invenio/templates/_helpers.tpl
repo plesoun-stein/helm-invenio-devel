@@ -577,27 +577,6 @@ Return the proper Invenio image name
           name: {{ include "invenio.fullname" . }}-copy-configfiles
       - secret:
           name: {{ include "invenio.fullname" . }}-backend-config
-      {{- if not (ternary .Values.postgresql.auth.password .Values.postgresqlExternal.password .Values.postgresql.enabled) }}
-      - secret:
-          name: {{ include "invenio.postgresql.secretName" . | trim }}
-          items:
-          - key: {{ include "invenio.postgresql.secretKey" . | trim }}
-            path: {{ include "invenio.postgresql.secretKey" . | trim }}
-      {{- end }}
-      {{- if not (ternary .Values.rabbitmq.auth.password .Values.rabbitmqExternal.password .Values.rabbitmq.enabled) }}
-      - secret:
-          name: {{ include "invenio.rabbitmq.secretName" . | trim }}
-          items:
-          - key: {{  include "invenio.rabbitmq.secretKey" . | trim }}
-            path: {{  include "invenio.rabbitmq.secretKey" . | trim }}
-      {{- end }}
-      {{- if not (ternary .Values.redis.auth.password .Values.redisExternal.password .Values.redis.enabled) }}
-      - secret:
-          name: {{ include "invenio.redis.secretName" . | trim }}
-          items:
-          - key: {{  include "invenio.redis.secretKey" . | trim }}
-            path: {{  include "invenio.redis.secretKey" . | trim }}
-      {{- end }}
       {{- with .Values.invenio.extraSecrets }}
       {{- toYaml . | nindent 6 }}
       {{- end }}

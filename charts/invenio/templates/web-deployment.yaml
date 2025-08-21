@@ -130,12 +130,10 @@ spec:
           {{- range .Values.web.extraVolumeMounts }}
           - {{ toYaml . | nindent 12 }}
           {{- end }}
-          {{- if or .Values.postgresql.configFile .Values.postgresqlExternal.configFile }}
-          - name: backend-services
+          - name: mounted-secrets 
             mountPath: {{ .Values.invenio.mountedDir }}
           - name: rendered-configs
             mountPath: {{.Values.invenio.configDir }}
-          {{- end }}
         securityContext:
           {{- with .Values.web.securityContext }}
           {{- toYaml . | nindent 10 }}
@@ -276,11 +274,9 @@ spec:
           name: {{ include "invenio.fullname" . }}-uwsgi-config
       - name: nginx-invenio-assets
         emptyDir: {}
-      {{- if or .Values.postgresql.configFile .Values.postgresqlExternal.configFile }}
       - name: rendered-configs
         emptyDir: {}
       {{- include "invenio.config.configFiles" . | trim | nindent 6 }}
-      {{- end }}
       {{- if .Values.persistence.enabled }}
       - name: shared-volume
         persistentVolumeClaim:

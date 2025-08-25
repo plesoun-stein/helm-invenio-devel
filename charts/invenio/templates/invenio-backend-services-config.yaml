@@ -1,3 +1,4 @@
+{{- if or .Values.postgresql.configFile .Values.postgresqlExternal.configFile  .Values.rabbitmq.configFile .Values.rabbitmqExternal.configFile  .Values.redis.configFile .Values.redisExternal.configFile }}
 apiVersion: v1
 kind: Secret
 metadata:
@@ -5,7 +6,6 @@ metadata:
   namespace: {{ .Release.Namespace }}
 type: Opaque
 stringData:
-  dummy: value
   {{- if or .Values.postgresql.configFile .Values.postgresqlExternal.configFile  }}
   INVENIO_DB_USER: {{ (include "invenio.postgresql.username" .  | trim) }}
   INVENIO_DB_HOST: {{ (include "invenio.postgresql.hostname" .  | trim) }}
@@ -38,4 +38,4 @@ stringData:
   INVENIO_CONFIG_REDIS_PASSWORD: {{ include "invenio.redis.password" . | trim}}
   {{- end }}
   {{- end }}
-
+{{- end }}

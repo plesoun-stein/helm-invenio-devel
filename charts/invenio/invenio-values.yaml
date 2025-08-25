@@ -75,7 +75,7 @@ invenio:
   existingSecret: ""
   extraSecrets:
   - secret: 
-      name: nr-repo-docs-test-prepsec-secrets-invenio-mail
+      name: test-stein-devel-prepsec-secrets-invenio-mail
       items: 
       - key: mail.yaml
         path: mail.yaml
@@ -157,10 +157,10 @@ invenio:
     enabled: false
     existing_secret: false
     secret_name: "remote-apps-secrets"
-    credentials:
-      - name: ""
-        consumer_key: ""
-        consumer_secret: ""
+    credentials: {}
+      # - name: ""
+      #   consumer_key: ""
+      #   consumer_secret: ""
   ## @param invenio.extra_config DEPRECATED: invenio.extraConfig instead
   extra_config: {}
   ## @param invenio.extraConfig Extra environment variables (templated) to be added to all the pods.

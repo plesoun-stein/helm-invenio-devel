@@ -14,3 +14,13 @@ stringData:
   copy.sh: |-
     cd {{ $mounted }}
     cp {{ printf "*.yaml %s" $rendered }}
+    {{- if or (and .Values.postgresql.configFile .Values.postgresql.enabled) (and .Values.postgresqlExternal.configFile (not .Values.postgresql.enabled)) }}
+    # postgres password from Values
+    {{ printf "INVENIO_DB_PASSWORD=$(cat INVENIO_DB_PASSWORD)" }}
+    {{ printf "INVENIO_DB_USER=$(cat INVENIO_DB_USER)" }}
+    {{ printf "INVENIO_DB_HOST=$(cat INVENIO_DB_HOST)" }}
+    {{ printf "INVENIO_DB_PORT=$(cat INVENIO_DB_PORT)" }}
+    {{ printf "INVENIO_DB_NAME=$(cat INVENIO_DB_NAME)" }}
+    {{ printf "INVENIO_DB_PROTOCOL=$(cat INVENIO_DB_PROTOCOL)" }}
+    {{ printf "echo INVENIO_SQLALCHEMY_DATABASE_URI: \\\"${INVENIO_DB_PROTOCOL}://${INVENIO_DB_USER}:${INVENIO_DB_PASSWORD}@${INVENIO_DB_HOST}:${INVENIO_DB_PORT}/${INVENIO_DB_NAME}\\\" >  %s/INVENIO_SQLALCHEMY_DATABASE_URI.yaml" $rendered }}
+    {{- end }}

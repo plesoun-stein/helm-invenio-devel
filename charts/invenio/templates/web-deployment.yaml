@@ -58,7 +58,7 @@ spec:
         command: [
             "/bin/bash",
             "-c",
-            "bash /mounted/copy.sh && uwsgi --ini /opt/invenio/src/uwsgi/uwsgi.ini",
+            "uwsgi --ini /opt/invenio/src/uwsgi/uwsgi.ini",
         ]
         resources: {{- toYaml .Values.web.resources | nindent 10 }}
         envFrom:
@@ -130,10 +130,9 @@ spec:
           {{- range .Values.web.extraVolumeMounts }}
           - {{ toYaml . | nindent 12 }}
           {{- end }}
-          - name: mounted-secrets 
-            mountPath: {{ .Values.invenio.mountedDir }}
           - name: rendered-configs
             mountPath: {{.Values.invenio.configDir }}
+            readOnly: true
         securityContext:
           {{- with .Values.web.securityContext }}
           {{- toYaml . | nindent 10 }}
@@ -213,6 +212,64 @@ spec:
           {{- end }}
       {{- end }}
       initContainers:
+        - name: render
+          image: {{ default .Values.web.image (include "invenio.image" .) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy | quote }}
+          command: [
+              "/bin/bash",
+              "-c",
+              "bash /mounted/copy.sh" 
+          ]
+          resources:
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
+          envFrom:
+          - configMapRef:
+              name: {{ include "invenio.fullname" . }}-config
+          - secretRef:
+              name: {{ include "invenio.secretName" . }}
+          {{- with .Values.invenio.extraEnvFrom }}
+          {{- tpl (. | toYaml) $ | nindent 10 }}
+          {{- end }}
+          {{- with .Values.web.extraEnvFrom }}
+          {{- tpl (. | toYaml) $ | nindent 10 }}
+          {{- end }}
+          env:
+          - name: TZ
+            value: {{ required "Missing .Values.global.timezone" .Values.global.timezone }}
+          {{- include "invenio.config.queue" . | nindent 10 }}
+          {{- include "invenio.config.database" . | nindent 10 }}
+          {{- include "invenio.config.cache" . | nindent 10 }}
+          {{- with .Values.invenio.extraEnvVars }}
+          {{-  toYaml . | nindent 10 }}
+          {{- end }}
+          {{- with .Values.web.extraEnvVars }}
+          {{-  toYaml . | nindent 10 }}
+          {{- end }}
+          {{- include "invenio.config.sentry" . | nindent 10 }}
+          {{- include "invenio.config.datacite" . | nindent 10 }}
+          {{- if .Values.invenio.remote_apps.enabled }}
+          {{- range .Values.invenio.remote_apps.credentials }}
+          - name: {{ default (printf "INVENIO_%s_APP_CREDENTIALS" .name) }}
+            valueFrom:
+              secretKeyRef:
+                name: {{ $.Values.invenio.remote_apps.secret_name }}
+                key: {{ default (printf "INVENIO_%s_APP_CREDENTIALS" .name) }}
+          {{- end }}
+          {{- end }}
+          {{- range .Values.invenio.extra_env_from_secret }}
+          - name: {{ .name }}
+            valueFrom:
+              secretKeyRef:
+                name: {{ .valueFrom.secretKeyRef.name }}
+                key: {{ .valueFrom.secretKeyRef.key }}
+          {{- end }}
+          volumeMounts:
+            - name: rendered-configs
+              mountPath: {{.Values.invenio.configDir }}
+            - name: mounted-secrets 
+              mountPath: {{ .Values.invenio.mountedDir }}
         # copy assets from uwsgi to nginx
         - name: copy-web-assets
           image: {{ default .Values.web.image (include "invenio.image" .) }}
@@ -275,7 +332,9 @@ spec:
       - name: nginx-invenio-assets
         emptyDir: {}
       - name: rendered-configs
-        emptyDir: {}
+        emptyDir:
+          sizeLimit: 10Mi
+          medium: Memory
       {{- include "invenio.config.configFiles" . | trim | nindent 6 }}
       {{- if .Values.persistence.enabled }}
       - name: shared-volume

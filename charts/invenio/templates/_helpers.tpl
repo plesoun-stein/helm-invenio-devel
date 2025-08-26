@@ -575,29 +575,6 @@ Return the proper Invenio image name
     sources:
       - secret: 
           name: {{ include "invenio.fullname" . }}-copy-configfiles
-      - secret:
-          name: {{ include "invenio.fullname" . }}-backend-config
-      {{- if or (and (not .Values.postgresql.auth.password) .Values.postgresql.enabled) (and (not .Values.postgresqlExternal.password) (not .Values.postgresql.enabled)) }}
-      - secret:
-          name: {{ include "invenio.postgresql.secretName" . | trim }}
-          items:
-          - key: {{ include "invenio.postgresql.secretKey" . | trim }}
-            path: INVENIO_DB_PASSWORD 
-      {{- end }}
-      {{- if or (and (not .Values.rabbitmq.auth.password) .Values.rabbitmq.enabled) (and (not .Values.rabbitmqExternal.password) (not .Values.rabbitmq.enabled)) }}
-      - secret:
-          name: {{ include "invenio.rabbitmq.secretName" . | trim }}
-          items:
-          - key: {{  include "invenio.rabbitmq.secretKey" . | trim }}
-            path:  INVENIO_AMQP_BROKER_PASSWORD
-      {{- end }}
-      {{- if or (and (not .Values.redis.auth.password)  .Values.redis.enabled) (and (not.Values.redisExternal.password) .Values.redis.enabled) }}
-      - secret:
-          name: {{ include "invenio.redis.secretName" . | trim }}
-          items:
-          - key: {{  include "invenio.redis.secretKey" . | trim }}
-            path: INVENIO_CONFIG_REDIS_PASSWORD
-      {{- end }}
       {{- with .Values.invenio.extraSecrets }}
       {{- toYaml . | nindent 6 }}
       {{- end }}

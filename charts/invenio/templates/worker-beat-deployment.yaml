@@ -39,6 +39,7 @@ spec:
           {{- tpl (toYaml .) $ | nindent 8 }}
         {{- end }}
         app.kubernetes.io/component: worker-beat
+        app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
       {{- with .Values.workerBeat.nodeSelector }}
       nodeSelector:

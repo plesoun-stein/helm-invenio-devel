@@ -17,4 +17,5 @@ spec:
       targetPort: 8080
   selector:
     app.kubernetes.io/component: web
+    app.kubernetes.io/instance: {{ .Release.Name }}
   type: {{ .Values.web.service.type }}

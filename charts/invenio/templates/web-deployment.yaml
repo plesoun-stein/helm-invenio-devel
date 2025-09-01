@@ -41,6 +41,7 @@ spec:
           {{- tpl (toYaml .) $ | nindent 8 }}
         {{- end }}
         app.kubernetes.io/component: web
+        app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
       terminationGracePeriodSeconds: {{ .Values.web.terminationGracePeriodSeconds }}
       {{- with .Values.web.nodeSelector }}
@@ -75,9 +76,10 @@ spec:
         env:
         - name: TZ
           value: {{ required "Missing .Values.global.timezone" .Values.global.timezone }}
-        {{- include "invenio.config.queue" . | nindent 8 }}
-        {{- include "invenio.config.database" . | nindent 8 }}
-        {{- include "invenio.config.cache" . | nindent 8 }}
+        {{- include "invenio.config.queue" . | trim | nindent 8 }}
+        {{- include "invenio.config.database" . | trim | nindent 8 }}
+        {{- include "invenio.config.cache" . | trim | nindent 8 }}
+        {{- include "invenio.config.opensearch" . | trim | nindent 8 }}
         {{- with .Values.invenio.extraEnvVars }}
         {{-  toYaml . | nindent 8 }}
         {{- end }}
@@ -133,12 +135,16 @@ spec:
           - name: rendered-configs
             mountPath: {{.Values.invenio.configDir }}
             readOnly: true
+          - name: mounted-secrets 
+            mountPath: {{.Values.invenio.mountedDir }}
+            readOnly: true
         securityContext:
           {{- with .Values.web.securityContext }}
           {{- toYaml . | nindent 10 }}
           {{- end }}
       - name: nginx
         image: {{ required "Missing .Values.nginx.image" .Values.nginx.image }}
+        args: ["/usr/sbin/nginx-debug", "-g", "daemon off; error_log /var/log/nginx/error.log debug;"] 
         env:
         - name: TZ
           value: {{ required "Missing .Values.global.timezone" .Values.global.timezone }}

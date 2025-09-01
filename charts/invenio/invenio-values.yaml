@@ -19,23 +19,29 @@ fullnameOverride: ""
 ## @param image.pullPolicy Invenio image pull policy
 ## @param image.pullSecrets Invenio image pull secrets
 image:
-  registry: ghcr.io/inveniosoftware
-  repository: demo-inveniordm/demo-inveniordm
-  tag: ""  # Defaults to .Chart.appVersion
-  digest: ""
-  ## Specify a imagePullPolicy
-  ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
-  ## ref: https://kubernetes.io/docs/concepts/containers/images/#pre-pulled-images
-  ##
-  pullPolicy: IfNotPresent
-  ## Optionally specify an array of imagePullSecrets.
-  ## Secrets must be manually created in the namespace.
-  ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
-  ## e.g:
-  ## pullSecrets:
-  ##   - name: myRegistryKeySecretName
-  ##
-  pullSecrets: []
+  pullSecrets:
+  - name: regcred
+  registry: apps.du.cesnet.cz
+  repository: eosc-repo-nma
+  tag: 0.5.6
+
+  # registry: ghcr.io/inveniosoftware
+  # repository: demo-inveniordm/demo-inveniordm
+  # tag: ""  # Defaults to .Chart.appVersion
+  # digest: ""
+  # ## Specify a imagePullPolicy
+  # ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
+  # ## ref: https://kubernetes.io/docs/concepts/containers/images/#pre-pulled-images
+  # ##
+  # pullPolicy: IfNotPresent
+  # ## Optionally specify an array of imagePullSecrets.
+  # ## Secrets must be manually created in the namespace.
+  # ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+  # ## e.g:
+  # ## pullSecrets:
+  # ##   - name: myRegistryKeySecretName
+  # ##
+  # pullSecrets: []
 
 ingress:
   annotations: {}
@@ -54,7 +60,7 @@ invenio:
   mountedDir: /mounted
   ## @param invenio.hostname Invenio hostname (templated) used in configuration varibales like APP_ALLOWED_HOSTS, SITE_HOSTNAME or SITE_URL
   ##
-  hostname: "vyvoj.test.kub1.du.cesnet.cz"
+  hostname: "aaaa.test.kub1.du.cesnet.cz"
   ## @param invenio.secret_key DEPRECATED: this is automatically generated now, or set by custom secret using invenio.existingSecret
   ##
   secret_key: ""
@@ -79,6 +85,11 @@ invenio:
       items: 
       - key: mail.yaml
         path: mail.yaml
+  - secret: 
+      name: test-stein-devel-prepcrt-certman-opensearch-http-cert 
+      items: 
+      - key: ca.crt
+        path: ca.crt
   # - secret:
   #     name: anysecretname 
   #     items:
@@ -173,7 +184,11 @@ invenio:
   extraEnvVars:
     - name: RELOAD_DEPL
       value: "001"
-  uwsgiExtraConfig: {}
+  uwsgiExtraConfig:
+  uwsgiExtraConfig:
+    max-requests: "40000"
+    max-requests-delta: "5000"
+    listen: "400"
   ## @param invenio.extraEnvFrom Extra secretRef or configMapRef for the `envFrom` field in all Invenio containers (templated).
   ##
   extraEnvFrom: []
@@ -209,9 +224,11 @@ invenio:
 
 nginx:
   image: "nginx:1.24.0"
-  max_conns: 100
+  max_conns: 400
   assets:
-    location: /opt/invenio/var/instance/static
+    location: /invenio/instance/static
+    # location: /opt/invenio/var/instance/static
+
   records:
     client_max_body_size: 100m
   files:
@@ -223,7 +240,11 @@ nginx:
   ## Another reason for this choice is that it's practically impossible to know which resource requests/limits are right, since that is entirely dependent on the hardware resources available in the target cluster as well as how the application is used (ammount of traffic, number of concurrent users, size of uploaded artifacts, etc.).
   ## Therefore, we think it's better that users get to set the resources explicitly for each container.
   ##
-  resources: {}
+  resources:
+    limits:
+      cpu: 1250m
+      memory: 2500Mi
+
     # requests:
     #   cpu: 250m
     #   memory: 500Mi
@@ -252,8 +273,8 @@ web:
   replicas: 1
   terminationGracePeriodSeconds: 60
   uwsgi:
-    processes: 2
-    threads: 2
+    processes: 4
+    threads: 7
   ## @param web.extraEnvVars Extra environment variables to be added to the pods.
   ##
   extraEnvVars: []
@@ -271,8 +292,8 @@ web:
         - -c
         - "uwsgi_curl -X HEAD -H 'Host: {{ include \"invenio.hostname\" $ }}' 127.0.0.1:5000 /ping"
     failureThreshold: 3
-    initialDelaySeconds: 5
-    periodSeconds: 5
+    initialDelaySeconds: 15
+    periodSeconds: 30
     successThreshold: 1
     timeoutSeconds: 1
   ## @param web.startupProbe templated `startupProbe` for the web container
@@ -292,7 +313,8 @@ web:
   ##
   livenessProbe: null
   assets:
-    location: /opt/invenio/var/instance/static
+    # location: /opt/invenio/var/instance/static
+    location: /invenio/instance/static
   ## @param web.resources `resources` for the web container
   ##
   ## We have decided to unset resources by default, leaving that as a conscious choice for the user.
@@ -300,13 +322,13 @@ web:
   ## Another reason for this choice is that it's practically impossible to know which resource requests/limits are right, since that is entirely dependent on the hardware resources available in the target cluster as well as how the application is used (ammount of traffic, number of concurrent users, size of uploaded artifacts, etc.).
   ## Therefore, we think it's better that users get to set the resources explicitly for each container.
   ##
-  resources: {}
-    # requests:
-    #   cpu: 500m
-    #   memory: 500Mi
-    # limits:
-    #   cpu: 1000m
-    #   memory: 1Gi
+  resources:
+    requests:
+      cpu: 500m
+      memory: 500Mi
+    limits:
+      cpu: 1000m
+      memory: 4Gi
   initContainers:
     ## @param web.initContainers.resources `resources` for the copy-web-assets initContainer
     ##
@@ -730,8 +752,7 @@ persistence:
   useExistingClaim: false
 
 redis:
-  configFile: true
-  enabled: true
+  enabled: false
   auth:
     enabled: true  # Dangerous! This lets Invenio connect to Redis unauthenticated!
       #password: bbbbccbcbcbcbcaaaa
@@ -743,10 +764,10 @@ redis:
     disableCommands: []  # Dangerous! This lets us run the `FLUSHALL` and `FLUSHDB` commands! Unfortunately, they are required by the wipe_recreate.sh script when installing Invenio.
 
 redisExternal:
-  hostname: aaaa 
+  hostname: test-stein-devel-haproxy
   # password:
-  existingSecret: bbb
-  existingSecretPasswordKey: ccc
+  existingSecret: test-stein-devel-prepsec-secrets-redis 
+  existingSecretPasswordKey: redisPassword
 
 ## RabbitMQ chart configuration
 ## ref: https://github.com/bitnami/charts/blob/main/bitnami/rabbitmq/values.yaml
@@ -884,9 +905,19 @@ postgresqlExternal: {}
   # existingSecretPasswordKey: "password"
 
 opensearch:
-  enabled: true
+  enabled: false
 
-externalOpensearch: {}
+opensearchExternal:
+  existingSecret: test-stein-devel-prepsec-secrets-opensearch-invenio-user
+  existingSecretPasswordKey: password
+  hostname: "test-stein-devel-opensearch"
+  username: invenio
+  protocol: https
+  useSsl: "True"
+  verifyCerts: "False"
+  sslAssertHostname: "False"
+  sslShowWarn: "False"
+  caCerts: "/mounted/ca.crt"
 
 logstash:
   enabled: false

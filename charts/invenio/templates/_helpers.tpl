@@ -345,9 +345,11 @@ Return the proper Invenio image name
 */}}
 {{- define "invenio.opensearch.hostname" -}}
   {{- if .Values.opensearch.enabled }}
-    {{- include "opensearch.service.name" .Subcharts.opensearch -}}
+    {{- $hostname := (include "opensearch.service.name" .Subcharts.opensearch) | trim  -}}
+    {{- printf "%q" (printf "[{\"host\": \"$hostname\"}]") -}}
   {{- else }}
-    {{- required "Missing .Values.opensearchExternal.hostname" .Values.opensearchExternal.hostname -}}
+    {{- $hostname := (required "Missing .Values.opensearchExternal.hostname" .Values.opensearchExternal.hostname) -}}
+    {{- printf "%q" (printf "[{\"host\": \"%s\"}]" $hostname) -}}
   {{- end }}
 {{- end -}}
 
@@ -440,6 +442,17 @@ Return the proper Invenio image name
 {{- end -}}
 
 {{/*
+  This template renders the caCerts for opensearch
+*/}}
+{{- define "invenio.opensearch.caCerts" -}}
+  {{- if .Values.opensearch.enabled }}
+    {{- "" -}}
+  {{- else }}
+    {{- required "Missing .Values.opensearchExternal.caCerts" .Values.opensearchExternal.caCerts -}}
+  {{- end }}
+{{- end -}}
+
+{{/*
   This template renders the sslAssertHostname for opensearch
 */}}
 {{- define "invenio.opensearch.sslAssertHostname" -}}
@@ -462,6 +475,52 @@ Return the proper Invenio image name
 {{- end -}}
 
 
+{{/*
+SEARCH_CLIENT_CONFIG={'use_ssl': False, 'verify_certs': False, 'ssl_assert_hostname': False, 'ssl_show_warn': False, 'ca_certs': None}
+INVENIO_SEARCH_HOSTS: {{ printf "[{'host': '%s'}]" (include "invenio.opensearch.hostname" .) | quote }}
+  value: {{ printf "%q" (printf "{\"use_ssl\": $(INVENIO_CONFIG_OPENSEARCH_USE_SSL), \"verify_certs\": $(INVENIO_CONFIG_OPENSEARCH_VERIFY_CERTS), \"ssl_assert_hostname\": $(INVENIO_CONFIG_OPENSEARCH_SSL_ASSERT_HOSTNAME), \"ssl_show_warn\": $(INVENIO_CONFIG_OPENSEARCH_SSL_SHOW_WARN), \"ca_certs\": \"$(INVENIO_CONFIG_OPENSEARCH_CA_CERTS)\", \"http_auth\": [\"$(INVENIO_CONFIG_OPENSEARCH_USER)\", \"$(INVENIO_CONFIG_OPENSEARCH_PASSWORD)\"]}") }}
+
+*/}}
+
+{{/*
+  Opensearch connection env section.
+*/}}
+{{- define "invenio.config.opensearch" -}}
+{{- if .Values.opensearch.enabled }}
+- name: INVENIO_SEARCH_HOSTS
+  value: {{ (include "invenio.opensearch.hostname" . | trim) }}
+{{- else }}
+- name: INVENIO_SEARCH_HOSTS
+  value: {{ (include "invenio.opensearch.hostname" . | trim) }}
+- name: "INVENIO_CONFIG_OPENSEARCH_USER"
+  value: {{ printf "%q" (include "invenio.opensearch.username" . | trim) }}
+- name: "INVENIO_CONFIG_OPENSEARCH_PROTOCOL"
+  value: {{ printf "%q" (include "invenio.opensearch.protocol" . | trim) }}
+- name: "INVENIO_CONFIG_OPENSEARCH_PORT"
+  value: {{ printf "%q" (include "invenio.opensearch.portString" . | trim) }}
+- name: "INVENIO_CONFIG_OPENSEARCH_USE_SSL"
+  value: {{ printf "%q" (include "invenio.opensearch.useSsl" . | trim) }}
+- name: "INVENIO_CONFIG_OPENSEARCH_VERIFY_CERTS"
+  value: {{ printf "%q" (include "invenio.opensearch.verifyCerts" . | trim) }}
+- name: "INVENIO_CONFIG_OPENSEARCH_SSL_ASSERT_HOSTNAME"
+  value: {{ printf "%q" (include "invenio.opensearch.sslAssertHostname" . | trim) }}
+- name: "INVENIO_CONFIG_OPENSEARCH_SSL_SHOW_WARN"
+  value: {{ printf "%q" (include "invenio.opensearch.sslShowWarn" . | trim) }}
+- name: "INVENIO_CONFIG_OPENSEARCH_CA_CERTS"
+  value: {{ printf "%q" (include "invenio.opensearch.caCerts" . | trim) }}
+- name: "INVENIO_CONFIG_OPENSEARCH_PASSWORD"
+{{- if .Values.opensearchExternal.password }}
+  value: {{ printf "%q" (include "invenio.opensearch.password" . | trim) }}
+{{- else }}
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "invenio.opensearch.secretName" . | trim }}
+      key:  {{ include "invenio.opensearch.secretKey" . | trim }}
+{{- end }}
+- name: INVENIO_SEARCH_CLIENT_CONFIG
+  value: {{ printf "%q" (printf "{\"use_ssl\": $(INVENIO_CONFIG_OPENSEARCH_USE_SSL), \"verify_certs\": $(INVENIO_CONFIG_OPENSEARCH_VERIFY_CERTS), \"ssl_assert_hostname\": $(INVENIO_CONFIG_OPENSEARCH_SSL_ASSERT_HOSTNAME), \"ssl_show_warn\": $(INVENIO_CONFIG_OPENSEARCH_SSL_SHOW_WARN), \"ca_certs\": \"$(INVENIO_CONFIG_OPENSEARCH_CA_CERTS)\", \"http_auth\": [\"$(INVENIO_CONFIG_OPENSEARCH_USER)\", \"$(INVENIO_CONFIG_OPENSEARCH_PASSWORD)\"]}") }}
+{{- end }}
+{{- end }}
 
 #########################     PostgreSQL connection configuration     #########################
 {{/*

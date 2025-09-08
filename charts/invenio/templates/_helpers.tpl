@@ -633,7 +633,7 @@ INVENIO_SEARCH_HOSTS: {{ printf "[{'host': '%s'}]" (include "invenio.opensearch.
   projected:
     sources:
       - secret: 
-          name: {{ include "invenio.fullname" . }}-copy-configfiles
+          name: {{ include "invenio.fullname" . }}-initcontainer-render-scripts
       {{- with .Values.invenio.extraSecrets }}
       {{- toYaml . | nindent 6 }}
       {{- end }}

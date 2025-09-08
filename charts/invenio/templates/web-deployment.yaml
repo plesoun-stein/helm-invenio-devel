@@ -224,7 +224,7 @@ spec:
           command: [
               "/bin/bash",
               "-c",
-              "bash /mounted/copy.sh" 
+              "bash /mounted/entrypoint" 
           ]
           resources:
             limits:

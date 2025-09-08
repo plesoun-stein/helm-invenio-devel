@@ -1,16 +1,81 @@
-{{- $mounted := .Values.invenio.mountedDir }}
-{{- $rendered := .Values.invenio.configDir }}
+{{- $root := . }}
+{{- $invenioFullname := include "invenio.fullname" . | trim }}
+{{- $mounted := required "missing dirname for mounted secrets .Values.invenio.mountedDir" .Values.invenio.mountedDir }}
+{{- $rendered := required "missing dirname for rendered configs .Values.invenio.configDir" .Values.invenio.configDir }}
+{{- $scriptsPrefix := required "missing filename prefix for extra rendering scripts .Values.invenio.scriptsPrefix" .Values.invenio.scriptsPrefix }}
 apiVersion: v1
 kind: Secret
 type: Opaque
 metadata:
-  name: {{ include "invenio.fullname" . }}-copy-configfiles
+  name: {{ printf "%s" $invenioFullname }}-initcontainer-render-scripts
   labels:
     {{- include "invenio.labels" . | nindent 4 }}
     app: {{ .Values.invenio.remote_apps.secret_name }}
   annotations:
     helm.sh/resource-policy: keep
 stringData:
-  copy.sh: |-
+  render-envs: |-
     cd {{ $rendered }}
     env | grep "^INVENIO" > env
+  entrypoint: |-
+    if [ ! -d {{ $mounted }} ] ; then 
+      exit 137 
+    fi
+    if [ ! -d {{ $rendered }} ] ; then 
+      exit 137
+    fi
+    cd {{ $mounted }}
+    ls -la  
+     
+    # exec script in num/lex order
+    # a scriptnames are defined by prefix
+    shopt -s nullglob
+    files=({{ printf "%s*" $scriptsPrefix }})
+    shopt -u nullglob
+    if [ ${#files[@]} -gt 0 ]; then 
+      mapfile -t listToExec < <(printf "%s\n" ${files[@]} | sort -n )
+      for item in ${listToExec[@]}; do
+        echo "executing ${item}"
+        bash ${item}
+      done
+    fi 
+    unset files
+
+    # copy certificates if any 
+    shopt -s nullglob
+    myCerts=(*.{crt,pem,cer,key,p12}) 
+    shopt -u nullglob
+    if [ ${#myCerts[@]} -gt 0 ]; then 
+      for item in ${myCerts[@]}; do
+        cp ${item} {{ $rendered }}
+      done
+    fi
+    unset myCerts
+    # execute extra init scripts in desired order
+    {{- $orderedList := list }}
+    {{- $orderedList := keys .Values.invenio.extraInitScripts | sortAlpha }}
+    {{- range $key := $orderedList }}
+    {{- $value := (printf "%s" (get $root.Values.invenio.extraInitScripts $key)) }}
+    if [ -e {{ $value }} ]; then 
+      bash {{ $value }}
+    else 
+      echo "File: {{ $value }} doesn't exists."
+      exit 137
+    fi
+    {{- end }}
+    
+    # execute extra init comands from .Values.invenio.extraInitCommands
+    {{- $orderedList := list }}
+    {{- $orderedList := keys .Values.invenio.extraInitCommands | sortAlpha }}
+    {{- range $key := $orderedList }}
+    {{- $value := (printf "%s" (get $root.Values.invenio.extraInitCommands $key)) }}
+    {{ tpl $value $root }}
+    {{- end }}
+
+    bash render-envs
+  extraa1: |-
+    echo extra jedna
+  extraa2: |-
+    echo extra dva
+  extrac12: |-
+    echo extra dvanact

@@ -14,68 +14,102 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
 stringData:
-  render-envs: |-
+  renderEnvs: |-
     cd {{ $rendered }}
-    env | grep "^INVENIO" > env
-  entrypoint: |-
-    if [ ! -d {{ $mounted }} ] ; then 
-      exit 137 
-    fi
-    if [ ! -d {{ $rendered }} ] ; then 
-      exit 137
-    fi
-    cd {{ $mounted }}
-    ls -la  
-     
-    # exec script in num/lex order
-    # a scriptnames are defined by prefix
-    shopt -s nullglob
-    files=({{ printf "%s*" $scriptsPrefix }})
-    shopt -u nullglob
-    if [ ${#files[@]} -gt 0 ]; then 
-      mapfile -t listToExec < <(printf "%s\n" ${files[@]} | sort -n )
-      for item in ${listToExec[@]}; do
-        echo "executing ${item}"
-        bash ${item}
-      done
-    fi 
-    unset files
-
+    env | grep "^INVENIO" >> env
+  copyCertificates: |-
     # copy certificates if any 
+    #
+    # get list of the cert files
     shopt -s nullglob
     myCerts=(*.{crt,pem,cer,key,p12}) 
     shopt -u nullglob
+    # copy
     if [ ${#myCerts[@]} -gt 0 ]; then 
       for item in ${myCerts[@]}; do
+        echo -e "copyCertificates: copying ${item}"
         cp ${item} {{ $rendered }}
       done
     fi
     unset myCerts
-    # execute extra init scripts in desired order
+  scriptsPrefix: |-
+    # The prefix is defined in .Values.invenio.scriptsPrefix
+    # Script names use this prefix and are located in the mounted directory defined in .Values.invenio.mountedDir
+    # This code executes the prefixed scripts in numerical order
+    # Ordering is determined using the Linux `sort -V` command
+    #
+    shopt -s nullglob
+    files=({{ printf "%s*" $scriptsPrefix }})
+    shopt -u nullglob
+    if [ ${#files[@]} -gt 0 ]; then 
+      mapfile -t listToExec < <(printf "%s\n" ${files[@]} | sort -V )
+      for item in ${listToExec[@]}; do
+        echo -e "\nscriptsPrefix: Executing item: ${item}"
+        bash ${item}
+      done
+    fi 
+    unset files
+  initScripts: |- 
+    # The code executes scripts defined in .Values.invenio.initScripts in lexicographical order
+    # because Helm/Sprig does not support numeric ordering for strings
+    # The following code is generated with helm template from .Values.invenio.initScripts
+    #
     {{- $orderedList := list }}
-    {{- $orderedList := keys .Values.invenio.extraInitScripts | sortAlpha }}
+    {{- $orderedList := keys .Values.invenio.initScripts | sortAlpha }}
     {{- range $key := $orderedList }}
-    {{- $value := (printf "%s" (get $root.Values.invenio.extraInitScripts $key)) }}
-    if [ -e {{ $value }} ]; then 
-      bash {{ $value }}
-    else 
-      echo "File: {{ $value }} doesn't exists."
-      exit 137
-    fi
+      {{- $value := (printf "%s" (get $root.Values.invenio.initScripts $key)) }}
+      if [ -e {{ $value }} ]; then 
+        echo -e "\ninitScripts: Executing index: {{ $key }} item:  {{ $value }}" 
+        bash {{ $value }}
+      else 
+        echo -e "\ninitScripts: Execution error. Index: {{ $key }} Item: {{ $value }} does not exists."
+        exit 137
+      fi
     {{- end }}
-    
-    # execute extra init comands from .Values.invenio.extraInitCommands
+  initCommands: |-
+    # Execute extra init commands from .Values.invenio.initCommands
+    #
     {{- $orderedList := list }}
-    {{- $orderedList := keys .Values.invenio.extraInitCommands | sortAlpha }}
+    {{- $orderedList := keys .Values.invenio.initCommands | sortAlpha }}
     {{- range $key := $orderedList }}
-    {{- $value := (printf "%s" (get $root.Values.invenio.extraInitCommands $key)) }}
+    {{- $value := (printf "%s" (get $root.Values.invenio.initCommands $key)) }}
     {{ tpl $value $root }}
     {{- end }}
+  entrypoint: |-
+    if [ ! -d {{ $mounted }} ] ; then 
+      exit 137 
+    else 
+      echo -e "\nEntrypoint: mounted directory: {{ $mounted }}"
+    fi  
+    if [ ! -d {{ $rendered }} ] ; then 
+      exit 137
+    else
+      echo -e "\nEntrypoint: rendered directory: {{ $rendered }}"
+    fi
+    cd {{ $mounted }}
+    
+    # copy certificates if any 
+    echo -e "\nEntrypoint: executing scritpt copyCertificates"
+    source copyCertificates
+    
+    # execute scripts with desired prefix in numerical order (sort -V)
+    echo -e "\nEntrypoint: executing script scriptsPrefix to execute scripts with required prefix"
+    source scriptsPrefix
+    
+    # execute scripts listed in .Values.inveino.initScripts
+    echo -e "\nEntrypoint: executing scripts listed in .Values.invenio.initScripts "
+    source initScripts
 
-    bash render-envs
-  extraa1: |-
-    echo extra jedna
-  extraa2: |-
-    echo extra dva
-  extrac12: |-
-    echo extra dvanact
+    # Execute extra init commands from .Values.invenio.initCommands
+    echo -e "\nEntrypoint: executing extra init commands from .Values.invenio.initCommands"
+    source initCommands
+
+    # at the end render env file
+    bash renderEnvs
+
+  {{/* # This part appends scripts from the "scripts/" directory or from the directory defined in .Values.invenio.extraScriptsDir */}}
+  {{- $extraScriptsDir := default "scripts" .Values.invenio.extraScriptsDir }}
+  {{- if gt (len ($root.Files.Glob (printf "%s/**" $extraScriptsDir))) 0 }}
+  {{- $pathString := (printf "%s/*" $extraScriptsDir) }}
+  {{- (.Files.Glob $pathString).AsConfig | nindent 2 }}
+  {{- end }}

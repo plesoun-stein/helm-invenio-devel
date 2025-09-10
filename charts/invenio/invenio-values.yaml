@@ -56,9 +56,6 @@ route:
 
 invenio:
   aaa: bbb
-  configDir: /configs
-  mountedDir: /mounted
-  scriptsPrefix: "extra"
   ## @param invenio.hostname Invenio hostname (templated) used in configuration varibales like APP_ALLOWED_HOSTS, SITE_HOSTNAME or SITE_URL
   ##
   hostname: "aaaa.test.kub1.du.cesnet.cz"
@@ -99,13 +96,16 @@ invenio:
   #     items:
   #     - key: anykey 
   #       path: anypath
-  extraInitScripts:
-    101: esc2
-    102: esc1
-  extraInitCommands:
-    112: "echo 12"
-    101: echo " extra command \t bbb"
-    102: "cp ca.crt {{ .Values.invenio.mountedDir }}"
+  configDir: /configs
+  mountedDir: /mounted
+  scriptsPrefix: "test"
+  initScripts:
+    a101: test12.sh
+    a102: test2.sh
+  initCommands:
+    112: "echo ic 12"
+    101: echo " ic 1 extra command \t bbb"
+    102: "echo ic 2; cp ca.crt {{ .Values.invenio.mountedDir }}"
   init: false
   default_users: []  # Requires invenio.init=true
   demo_data: false  # Setting invenio.demo_data=true requires also setting default_users!

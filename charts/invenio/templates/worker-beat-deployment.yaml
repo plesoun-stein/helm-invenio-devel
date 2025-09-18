@@ -56,7 +56,7 @@ spec:
         command: [
           "/bin/bash",
           "-c",
-          "bash /mounted/copy.sh && celery -A {{ .Values.worker.app }} beat -l {{ .Values.worker.log_level }} -s {{ .Values.worker.celery_schedule }} --pidfile {{ .Values.worker.celery_pidfile }}"
+          "celery -A {{ .Values.worker.app }} beat -l {{ .Values.worker.log_level }} -s {{ .Values.worker.celery_schedule }} --pidfile {{ .Values.worker.celery_pidfile }}"
         ]
         securityContext:
           {{- with .Values.workerBeat.securityContext }}

@@ -56,7 +56,7 @@ spec:
           command: [
               "/bin/bash",
               "-c",
-              "bash /mounted/copy.sh && celery -A {{ .Values.worker.app }} worker -c {{ .Values.worker.concurrency }} -l {{ .Values.worker.log_level }}"
+              "celery -A {{ .Values.worker.app }} worker -c {{ .Values.worker.concurrency }} -l {{ .Values.worker.log_level }}"
           ]
           resources: {{- toYaml .Values.worker.resources | nindent 12 }}
           securityContext:

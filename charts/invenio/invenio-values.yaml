@@ -91,6 +91,7 @@ invenio:
   - secret:
       name: test-stein-devel-prepsec-secrets-extrascripts
 
+
   # - secret:
   #     name: anysecretname 
   #     items:

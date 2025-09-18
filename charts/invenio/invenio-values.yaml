@@ -55,7 +55,6 @@ route:
   annotations: {}
 
 invenio:
-  aaa: bbb
   ## @param invenio.hostname Invenio hostname (templated) used in configuration varibales like APP_ALLOWED_HOSTS, SITE_HOSTNAME or SITE_URL
   ##
   hostname: "aaaa.test.kub1.du.cesnet.cz"
@@ -77,27 +76,18 @@ invenio:
   ## ref: https://inveniordm.docs.cern.ch/customize/authentication/#security
   ##
   existingSecret: ""
+  mountedDir: /mounted
   extraSecrets:
-  - secret: 
-      name: test-stein-devel-prepsec-secrets-invenio-mail
-      items: 
-      - key: mail.yaml
-        path: mail.yaml
   - secret: 
       name: test-stein-devel-prepcrt-certman-opensearch-http-cert 
       items: 
       - key: ca.crt
         path: ca.crt
-  - secret:
-      name: test-stein-devel-prepsec-secrets-extrascripts
-
-
   # - secret:
   #     name: anysecretname 
   #     items:
   #     - key: anykey 
   #       path: anypath
-  mountedDir: /mounted
   init: false
   default_users: []  # Requires invenio.init=true
   demo_data: false  # Setting invenio.demo_data=true requires also setting default_users!
@@ -184,26 +174,40 @@ invenio:
   ## @param invenio.extraEnvVars Extra environment variables to be added to all the pods.
   ##
   extraEnvVars:
-    - name: RELOAD_DEPL
-      value: "001"
-    - name: INVENIO_ENTRYPOINT
-      value: "/mounted/entrypoint"
-    - name: INVENIO_DIRS_RENDERED_CONFIG
-      value: "/configs"
-    - name: INVENIO_ENTRYPOINT_SCRIPTS
-      value: "/mounted/scripts"
-  uwsgiExtraConfig:
+  # nasledujici ctyri envy jsou okolo druhu deplomentu, mira musi rict, ktere presne se maji pouzivat
+  - name: INVENIO_DEPLOYMENT_MODE
+    value: "test"
+  - name: INVENIO_ENV
+    value: test
+  - name: INVENIO_DEPLOYMENT_MODE
+    value: test
+  - name: PYTHONWARNINGS
+    value: ignore
+  - name: INVENIO_LOGGING_CONSOLE_LEVEL
+    value: WARNING
+  # aby fungovalo preview pro velke soubory
+  - name: PREVIEWER_MAX_IMAGE_SIZE_BYTES
+    value: "33554432"
+  - name: INVENIO_PREVIEWER_MAX_IMAGE_SIZE_BYTES
+    value: "33554432"
+  # local logins
+  # - name: INVENIO_ACCOUNTS_LOCAL_LOGIN_ENABLED
+  #   value: "True"
+
+  extraEnvFrom:
+    - secretRef:
+        name: test-stein-devel-prepsec-secrets-invenio-s3
+    # - secretRef:
+    #     name: foo
+    # - configMapRef:
+    #     name: bar
+
   uwsgiExtraConfig:
     max-requests: "40000"
     max-requests-delta: "5000"
     listen: "400"
   ## @param invenio.extraEnvFrom Extra secretRef or configMapRef for the `envFrom` field in all Invenio containers (templated).
   ##
-  extraEnvFrom: []
-    # - secretRef:
-    #     name: foo
-    # - configMapRef:
-    #     name: bar
 
   ## @param invenio.vocabularies Vocabularies to be loaded as files under /app_data/vocabularies
   ## Example

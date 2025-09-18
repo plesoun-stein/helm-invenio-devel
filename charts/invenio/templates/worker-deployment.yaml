@@ -80,6 +80,7 @@ spec:
           {{- include "invenio.config.queue" . | nindent 10 }}
           {{- include "invenio.config.database" . | nindent 10 }}
           {{- include "invenio.config.cache" . | nindent 10 }}
+          {{- include "invenio.config.opensearch" . | trim | nindent 10 }}
           {{- with .Values.invenio.extraEnvVars }}
           {{- toYaml . | nindent 10 }}
           {{- end }}

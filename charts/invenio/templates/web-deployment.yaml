@@ -138,6 +138,8 @@ spec:
           - name: mounted-secrets 
             mountPath: {{.Values.invenio.mountedDir }}
             readOnly: true
+          - name: render-scripts
+            mountPath: {{ .Values.invenio.renderScripts }}
         securityContext:
           {{- with .Values.web.securityContext }}
           {{- toYaml . | nindent 10 }}
@@ -222,9 +224,7 @@ spec:
           image: {{ default .Values.web.image (include "invenio.image" .) }}
           imagePullPolicy: {{ .Values.image.pullPolicy | quote }}
           command: [
-              "/bin/bash",
-              "-c",
-              "bash /mounted/entrypoint" 
+              "bash /mounted/scripts/entrypoint", 
           ]
           resources:
             limits:
@@ -276,6 +276,9 @@ spec:
               mountPath: {{.Values.invenio.configDir }}
             - name: mounted-secrets 
               mountPath: {{ .Values.invenio.mountedDir }}
+              readOnly: true
+            - name: render-scripts
+              mountPath: {{ .Values.invenio.renderScripts }}
         # copy assets from uwsgi to nginx
         - name: copy-web-assets
           image: {{ default .Values.web.image (include "invenio.image" .) }}

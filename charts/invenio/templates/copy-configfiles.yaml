@@ -1,8 +1,4 @@
-{{- $root := . }}
 {{- $invenioFullname := include "invenio.fullname" . | trim }}
-{{- $mounted := required "missing dirname for mounted secrets .Values.invenio.mountedDir" .Values.invenio.mountedDir }}
-{{- $rendered := required "missing dirname for rendered configs .Values.invenio.configDir" .Values.invenio.configDir }}
-{{- $scriptsPrefix := required "missing filename prefix for extra rendering scripts .Values.invenio.scriptsPrefix" .Values.invenio.scriptsPrefix }}
 apiVersion: v1
 kind: Secret
 type: Opaque
@@ -14,102 +10,73 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
 stringData:
-  renderEnvs: |-
-    cd {{ $rendered }}
-    env | grep "^INVENIO" >> env
-  copyCertificates: |-
-    # copy certificates if any 
-    #
-    # get list of the cert files
-    shopt -s nullglob
-    myCerts=(*.{crt,pem,cer,key,p12}) 
-    shopt -u nullglob
-    # copy
-    if [ ${#myCerts[@]} -gt 0 ]; then 
-      for item in ${myCerts[@]}; do
-        echo -e "copyCertificates: copying ${item}"
-        cp ${item} {{ $rendered }}
-      done
-    fi
-    unset myCerts
-  scriptsPrefix: |-
-    # The prefix is defined in .Values.invenio.scriptsPrefix
-    # Script names use this prefix and are located in the mounted directory defined in .Values.invenio.mountedDir
-    # This code executes the prefixed scripts in numerical order
-    # Ordering is determined using the Linux `sort -V` command
-    #
-    shopt -s nullglob
-    files=({{ printf "%s*" $scriptsPrefix }})
-    shopt -u nullglob
-    if [ ${#files[@]} -gt 0 ]; then 
-      mapfile -t listToExec < <(printf "%s\n" ${files[@]} | sort -V )
-      for item in ${listToExec[@]}; do
-        echo -e "\nscriptsPrefix: Executing item: ${item}"
-        bash ${item}
-      done
-    fi 
-    unset files
-  initScripts: |- 
-    # The code executes scripts defined in .Values.invenio.initScripts in lexicographical order
-    # because Helm/Sprig does not support numeric ordering for strings
-    # The following code is generated with helm template from .Values.invenio.initScripts
-    #
-    {{- $orderedList := list }}
-    {{- $orderedList := keys .Values.invenio.initScripts | sortAlpha }}
-    {{- range $key := $orderedList }}
-      {{- $value := (printf "%s" (get $root.Values.invenio.initScripts $key)) }}
-      if [ -e {{ $value }} ]; then 
-        echo -e "\ninitScripts: Executing index: {{ $key }} item:  {{ $value }}" 
-        bash {{ $value }}
-      else 
-        echo -e "\ninitScripts: Execution error. Index: {{ $key }} Item: {{ $value }} does not exists."
-        exit 137
-      fi
-    {{- end }}
-  initCommands: |-
-    # Execute extra init commands from .Values.invenio.initCommands
-    #
-    {{- $orderedList := list }}
-    {{- $orderedList := keys .Values.invenio.initCommands | sortAlpha }}
-    {{- range $key := $orderedList }}
-    {{- $value := (printf "%s" (get $root.Values.invenio.initCommands $key)) }}
-    {{ tpl $value $root }}
-    {{- end }}
-  entrypoint: |-
-    if [ ! -d {{ $mounted }} ] ; then 
-      exit 137 
+  invenio-001-entrypoint-settings: |-
+    # Test for the existence of the directory containing entrypoint scripts
+    if [ -v INVENIO_ENTRYPOINT_SCRIPTS ] || [ -z INVENIO_ENTRYPOINT_SCRIPTS ]; then 
+      echo -e "\ninvenio-001-entrypoint-settings: variable INVENIO_ENTRYPOINT_SCRIPTS not set. I do not know scripts location"
+      exit 137
+    elif [ ! -d ${INVENIO_ENTRYPOINT_SCRIPTS} ] ; then 
+      echo -e "\ninvenio-001-entrypoint-settings: variable INVENIO_ENTRYPOINT_SCRIPTS points to ${INVENIO_ENTRYPOINT_SCRIPTS}"
+      echo -e "\ninvenio-001-entrypoint-settings: a directory ${INVENIO_ENTRYPOINT_SCRIPTS} does not exists."
+      exit 137
     else 
-      echo -e "\nEntrypoint: mounted directory: {{ $mounted }}"
+      # Remove trailing slash if present 
+      export INVENIO_ENTRYPOINT_SCRIPTS=${INVENIO_ENTRYPOINT_SCRIPTS%\/}
+      echo -e "\ninvenio-001-entrypoint-settings: entrypoint scripts directory: ${INVENIO_ENTRYPOINT_SCRIPTS}  "
     fi  
-    if [ ! -d {{ $rendered }} ] ; then 
+  invenio-002-rendered-directory: |-
+    # Test for the existence of the directory with the final rendered configuration
+    if [ -v INVENIO_DIRS_RENDERED_CONFIG ] || [ -z INVENIO_DIRS_RENDERED_CONFIG ]; then
+      echo -e "\ninvenio-002-rendered-directory: variable INVENIO_DIRS_RENDERED_CONFIG not set. I do not know where to store final configuration"
+      exit 137
+    elif [ ! -d ${INVENIO_DIRS_RENDERED_CONFIG} ] ; then
+      echo -e "\ninvenio-002-rendered-directory: variable INVENIO_DIRS_RENDERED_CONFIG points to directory ${INVENIO_DIRS_RENDERED_CONFIG}"
+      echo -e "\ninvenio-002-rendered-directory: directory ${INVENIO_DIRS_RENDERED_CONFIG} does not exists."
       exit 137
     else
-      echo -e "\nEntrypoint: rendered directory: {{ $rendered }}"
+      # Remove trailing slash if present 
+      export INVENIO_DIRS_RENDERED_CONFIG=${INVENIO_DIRS_RENDERED_CONFIG%\/}
+      echo -e "\ninvenio-002-rendered-directory: rendered config directory: ${INVENIO_DIRS_RENDERED_CONFIG}"
     fi
-    cd {{ $mounted }}
-    
-    # copy certificates if any 
-    echo -e "\nEntrypoint: executing scritpt copyCertificates"
-    source copyCertificates
-    
-    # execute scripts with desired prefix in numerical order (sort -V)
-    echo -e "\nEntrypoint: executing script scriptsPrefix to execute scripts with required prefix"
-    source scriptsPrefix
-    
-    # execute scripts listed in .Values.inveino.initScripts
-    echo -e "\nEntrypoint: executing scripts listed in .Values.invenio.initScripts "
-    source initScripts
+  invenio-011-check-environments: |-
+    if [ ! -v INVENIO_ENV ] || [ -z INVENIO_ENV ]; then 
+      echo -e "invenio-001-check-environments: Variable INVENIO_ENV not set or variable is empty"
+      exit 11
+    else
+      echo -e ""invenio-001-check-environments: Environment is set. INVENIO_ENV=${INVENIO_ENV}""
+    fi
+  invenio-012-session-cookie: |-
+    if [ ${INVEIO_ENV^^} = "PRODUCTION" ]; then 
+      if [ ! -v INVENIO_SESSION_COOKIE_SECURE ] || [ -z INVENIO_SESSION_COOKIE_SECURE ] || [ ${INVENIO_SESSION_COOKIE_SECURE^^} != "TRUE" ] ; then 
+        echo -e "inveio-012-session-cookie: Variable INVENIO_SESSION_COOKIE_SECURE not set or variable is empty or not set to True"
+        exit 12
+      else 
+        echo -e "inveio-012-session-cookie: Variable INVENIO_SESSION_COOKIE_SECURE set to ${INVENIO_SESSION_COOKIE_SECURE}"
+      fi
+    else
+      echo -e "inveio-012-session-cookie: Variable INVENIO_SESSION_COOKIE_SECURE set to ${INVENIO_SESSION_COOKIE_SECURE}"
+    fi
+  invenio-110-check-redis: |-
+    # there should be a redis-cli or python check for redis
+    echo -e "invenio-110-check-redis: there should be a redis-cli or python check for redis"
+  invenio-449-render-envs: |-
+    cd ${INVENIO_DIRS_RENDERED_CONFIG} 
+    env | grep "^INVENIO" >> env
+  entrypoint: |-
+    cd ${INVENIO_ENTRYPOINT_SCRIPTS}     
+    # This code executes a scripts in lexicographical order
+    # get file list as shell glob expansion 
+    shopt -s nullglob
+    files=(${INVENIO_ENTRYPOINT_SCRIPTS}/invenio*)
+    echo ${files[*]}
+    shopt -u nullglob
+    # Execute files in lexicographical order
+    if [ ${#files[@]} -gt 0 ]; then 
+    #mapfile -t listToExec < <(printf "%s\n" ${files[@]} | sort -V )
+    #for item in ${listToExec[@]}; do
+      for item in ${files[@]}; do
+        echo -e "\nExecuting item: ${item}"
+        source ${item}
+      done
+    fi 
 
-    # Execute extra init commands from .Values.invenio.initCommands
-    echo -e "\nEntrypoint: executing extra init commands from .Values.invenio.initCommands"
-    source initCommands
-
-    # at the end render env file
-    bash renderEnvs
-
-  {{/* # This part appends scripts from the "scripts/" directory or from the directory defined in .Values.invenio.extraScriptsDir */}}
-  {{- $extraScriptsDir := default "scripts" .Values.invenio.extraScriptsDir }}
-  {{- if gt (len ($root.Files.Glob (printf "%s/**" $extraScriptsDir))) 0 }}
-  {{- $pathString := (printf "%s/*" $extraScriptsDir) }}
-  {{- (.Files.Glob $pathString).AsConfig | nindent 2 }}
-  {{- end }}

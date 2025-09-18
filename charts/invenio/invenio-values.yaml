@@ -96,16 +96,7 @@ invenio:
   #     items:
   #     - key: anykey 
   #       path: anypath
-  configDir: /configs
   mountedDir: /mounted
-  scriptsPrefix: "test"
-  initScripts:
-    a101: test12.sh
-    a102: test2.sh
-  initCommands:
-    112: "echo ic 12"
-    101: echo " ic 1 extra command \t bbb"
-    102: "echo ic 2; cp ca.crt {{ .Values.invenio.mountedDir }}"
   init: false
   default_users: []  # Requires invenio.init=true
   demo_data: false  # Setting invenio.demo_data=true requires also setting default_users!
@@ -194,6 +185,12 @@ invenio:
   extraEnvVars:
     - name: RELOAD_DEPL
       value: "001"
+    - name: INVENIO_ENTRYPOINT
+      value: "/mounted/entrypoint"
+    - name: INVENIO_DIRS_RENDERED_CONFIG
+      value: "/configs"
+    - name: INVENIO_ENTRYPOINT_SCRIPTS
+      value: "/mounted/scripts"
   uwsgiExtraConfig:
   uwsgiExtraConfig:
     max-requests: "40000"

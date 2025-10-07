@@ -492,6 +492,7 @@ INVENIO_SEARCH_HOSTS: {{ printf "[{'host': '%s'}]" (include "invenio.opensearch.
 {{- else }}
 - name: INVENIO_SEARCH_HOSTS
   value: {{ (include "invenio.opensearch.hostname" . | trim) }}
+{{- if .Values.opensearchExternal.authEnabled }}
 - name: "INVENIO_CONFIG_OPENSEARCH_USER"
   value: {{ printf "%q" (include "invenio.opensearch.username" . | trim) }}
 - name: "INVENIO_CONFIG_OPENSEARCH_PROTOCOL"
@@ -519,6 +520,7 @@ INVENIO_SEARCH_HOSTS: {{ printf "[{'host': '%s'}]" (include "invenio.opensearch.
 {{- end }}
 - name: INVENIO_SEARCH_CLIENT_CONFIG
   value: {{ printf "%q" (printf "{\"use_ssl\": $(INVENIO_CONFIG_OPENSEARCH_USE_SSL), \"verify_certs\": $(INVENIO_CONFIG_OPENSEARCH_VERIFY_CERTS), \"ssl_assert_hostname\": $(INVENIO_CONFIG_OPENSEARCH_SSL_ASSERT_HOSTNAME), \"ssl_show_warn\": $(INVENIO_CONFIG_OPENSEARCH_SSL_SHOW_WARN), \"ca_certs\": \"$(INVENIO_CONFIG_OPENSEARCH_CA_CERTS)\", \"http_auth\": [\"$(INVENIO_CONFIG_OPENSEARCH_USER)\", \"$(INVENIO_CONFIG_OPENSEARCH_PASSWORD)\"]}") }}
+{{- end }}
 {{- end }}
 {{- end }}
 

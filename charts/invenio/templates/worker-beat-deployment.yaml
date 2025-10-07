@@ -74,10 +74,6 @@ spec:
           mountPath: "/opt/invenio/var/instance/app_data/vocabularies/{{ $key }}"
           subPath: "{{ $key }}"
         {{- end }}
-        - name: mounted-secrets 
-          mountPath: {{ .Values.invenio.mountedDir }}
-        - name: rendered-configs
-          mountPath: {{.Values.invenio.configDir }}
         envFrom:
         - configMapRef:
             name: {{ include "invenio.fullname" . }}-config
@@ -121,8 +117,6 @@ spec:
         {{- end }}
       volumes:
       {{- include "invenio.config.configFiles" . | trim | nindent 6 }}
-      - name: rendered-configs
-        emptyDir: {}
       - name: var-run-celery
         emptyDir:
           medium: Memory

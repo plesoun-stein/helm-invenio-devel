@@ -132,9 +132,6 @@ spec:
           {{- range .Values.web.extraVolumeMounts }}
           - {{ toYaml . | nindent 12 }}
           {{- end }}
-          - name: mounted-secrets 
-            mountPath: {{.Values.invenio.mountedDir }}
-            readOnly: true
         securityContext:
           {{- with .Values.web.securityContext }}
           {{- toYaml . | nindent 10 }}

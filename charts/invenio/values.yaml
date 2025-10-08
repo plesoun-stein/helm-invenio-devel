@@ -205,6 +205,18 @@ invenio:
     #     name: foo
     # - configMapRef:
     #     name: bar
+  ## @param invenio.extraSecrets Extra secrets mounted as projected volume by default into `/mounted` or invenio.extraSecretsMountPath
+  ##
+  extraSecrets: [] 
+  # - secret:
+  #     name: anysecretname 
+  #     items:
+  #     - key: anykey 
+  #       path: anypath
+  ## @param invenio.extraSecretsMountPath with extraSecrets you can change their mountpoint here
+  ##
+  # extraSecretsMountPath: /any/great/path
+
 
   ## @param invenio.vocabularies Vocabularies to be loaded as files under /app_data/vocabularies
   ## Example

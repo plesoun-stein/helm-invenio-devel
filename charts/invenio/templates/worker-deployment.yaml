@@ -123,6 +123,10 @@ spec:
               mountPath: "/opt/invenio/var/instance/app_data/vocabularies/{{ $key }}"
               subPath: "{{ $key }}"
             {{- end }}
+            {{- if .Values.invenio.extraSecrets }}
+            - name: mounted-secrets
+              mountPath: {{ default "/mounted" .Values.invenio.extraSecretsMountPath }}
+            {{- end }}
         {{- if .Values.kerberos.enabled }}
         - name: kerberos-credentials
           image: {{ required "Missing .Values.kerberos.image" .Values.kerberos.image }}
@@ -161,7 +165,9 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
       volumes:
+        {{- if .Values.invenio.extraSecrets }}
         {{- include "invenio.config.configFiles" . | trim | nindent 8 }}
+        {{- end }}
         {{- if .Values.persistence.enabled }}
         - name: shared-volume
           persistentVolumeClaim:

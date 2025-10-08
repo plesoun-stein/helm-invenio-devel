@@ -132,13 +132,16 @@ spec:
           {{- range .Values.web.extraVolumeMounts }}
           - {{ toYaml . | nindent 12 }}
           {{- end }}
+          {{- if .Values.invenio.extraSecrets }}
+          - name: mounted-secrets
+            mountPath: {{ default "/mounted" .Values.invenio.extraSecretsMountPath }}
+          {{- end }}
         securityContext:
           {{- with .Values.web.securityContext }}
           {{- toYaml . | nindent 10 }}
           {{- end }}
       - name: nginx
         image: {{ required "Missing .Values.nginx.image" .Values.nginx.image }}
-        args: ["/usr/sbin/nginx-debug", "-g", "daemon off; error_log /var/log/nginx/error.log debug;"] 
         env:
         - name: TZ
           value: {{ required "Missing .Values.global.timezone" .Values.global.timezone }}
@@ -157,6 +160,10 @@ spec:
         - name: nginx-invenio-assets
           mountPath: "{{ .Values.nginx.assets.location }}"
           readOnly: true
+        {{- if .Values.invenio.extraSecrets }}
+        - name: mounted-secrets
+          mountPath: {{ default "/mounted" .Values.invenio.extraSecretsMountPath }}
+        {{- end }}
         readinessProbe:
           httpGet:
             path: /ping
@@ -273,7 +280,9 @@ spec:
           name: {{ include "invenio.fullname" . }}-uwsgi-config
       - name: nginx-invenio-assets
         emptyDir: {}
+      {{- if .Values.invenio.extraSecrets }} 
       {{- include "invenio.config.configFiles" . | trim | nindent 6 }}
+      {{- end }}
       {{- if .Values.persistence.enabled }}
       - name: shared-volume
         persistentVolumeClaim:

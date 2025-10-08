@@ -631,14 +631,12 @@ INVENIO_SEARCH_HOSTS: {{ printf "[{'host': '%s'}]" (include "invenio.opensearch.
 {{- end -}}
 
 {{- define "invenio.config.configFiles" }}
-{{- if .Values.invenio.extraSecrets }}
 - name: mounted-secrets 
   projected:
     sources:
       {{- with .Values.invenio.extraSecrets }}
       {{- toYaml . | nindent 6 }}
       {{- end }}
-{{- end }}
 {{- end }}
 
 {{/*

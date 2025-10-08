@@ -123,11 +123,11 @@ Return the proper Invenio image name
 {{/*
   This template renders the port number for Redis.
 */}}
-{{- define "invenio.redis.portString" -}}
+{{- define "invenio.redis.port" -}}
   {{- if .Values.redis.enabled }}
     {{- print "6379" | quote -}}
   {{- else }}
-    {{- print "6379" | quote -}}
+    {{- default "6379" .Values.redisExternal.port | quote -}}
   {{- end }}
 {{- end -}}
 
@@ -138,7 +138,7 @@ Return the proper Invenio image name
   {{- if .Values.redis.enabled }}
     {{- print "redis" -}}
   {{- else }}
-    {{- print "redis" -}}
+    {{- default "redis" .Values.redisExternal.redisProtocol -}}
   {{- end }}
 {{- end -}}
 
@@ -151,7 +151,7 @@ Return the proper Invenio image name
 - name: INVENIO_CONFIG_REDIS_HOST
   value: {{ include "invenio.redis.hostname" . }}
 - name: INVENIO_CONFIG_REDIS_PORT
-  value: {{ include "invenio.redis.portString" . }}
+  value: {{ include "invenio.redis.port" . }}
 - name: INVENIO_CONFIG_REDIS_PROTOCOL
   value: {{ include "invenio.redis.protocol" . }}
 - name: INVENIO_CONFIG_REDIS_PASSWORD
@@ -495,10 +495,6 @@ INVENIO_SEARCH_HOSTS: {{ printf "[{'host': '%s'}]" (include "invenio.opensearch.
 {{- if .Values.opensearchExternal.authEnabled }}
 - name: "INVENIO_CONFIG_OPENSEARCH_USER"
   value: {{ printf "%q" (include "invenio.opensearch.username" . | trim) }}
-- name: "INVENIO_CONFIG_OPENSEARCH_PROTOCOL"
-  value: {{ printf "%q" (include "invenio.opensearch.protocol" . | trim) }}
-- name: "INVENIO_CONFIG_OPENSEARCH_PORT"
-  value: {{ printf "%q" (include "invenio.opensearch.portString" . | trim) }}
 - name: "INVENIO_CONFIG_OPENSEARCH_USE_SSL"
   value: {{ printf "%q" (include "invenio.opensearch.useSsl" . | trim) }}
 - name: "INVENIO_CONFIG_OPENSEARCH_VERIFY_CERTS"

@@ -426,10 +426,10 @@ Return the proper Invenio image name
   {{- if .Values.opensearch.enabled }}
     {{- "" -}}
   {{- else }}
-    {{- if .Values.opensearchExternal.verifyCerts }}
+    {{- if (eq .Values.opensearchExternal.verifyCerts "True")  }}
       {{- required "Missing .Values.opensearchExternal.caCerts" .Values.opensearchExternal.caCerts -}}
     {{- else }}
-      {{- print "\"\"" }}
+      {{- print "" }}
     {{- end }}
   {{- end }}
 {{- end -}}

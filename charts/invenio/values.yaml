@@ -916,7 +916,7 @@ redis:
     ## @param redis.replica.disableCommands
     disableCommands: []  # Dangerous! This lets us run the `FLUSHALL` and `FLUSHDB` commands! Unfortunately, they are required by the wipe_recreate.sh script when installing Invenio.
 
-## @param redisExternal External RabbitMQ configuration
+## @param redisExternal External redis configuration
 ## All of these values are only used when redis.enabled is set to false
 ## @extra redisExternal.password Password
 ## @extra redisExternal.hostname

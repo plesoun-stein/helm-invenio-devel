@@ -398,35 +398,13 @@ Return the proper Invenio image name
 {{- end }}
 
 {{/*
-  This template renders the port number for opensearch.
-*/}}
-{{- define "invenio.opensearch.portString" -}}
-  {{- if .Values.opensearch.enabled }}
-    {{- print "9200" | quote -}}
-  {{- else }}
-    {{- print "9200" | quote -}}
-  {{- end }}
-{{- end -}}
-
-{{/*
-  This template renders the protocol for opensearch
-*/}}
-{{- define "invenio.opensearch.protocol" -}}
-  {{- if .Values.opensearch.enabled }}
-    {{- "" -}}
-  {{- else }}
-    {{- required "Missing .Values.opensearchExternal.protocol" .Values.opensearchExternal.protocol -}}
-  {{- end }}
-{{- end -}}
-
-{{/*
   This template renders the useSsl for opensearch
 */}}
 {{- define "invenio.opensearch.useSsl" -}}
   {{- if .Values.opensearch.enabled }}
     {{- "" -}}
   {{- else }}
-    {{- required "Missing .Values.opensearchExternal.useSsl" .Values.opensearchExternal.useSsl -}}
+    {{- default "False" .Values.opensearchExternal.useSsl -}}
   {{- end }}
 {{- end -}}
 
@@ -437,7 +415,7 @@ Return the proper Invenio image name
   {{- if .Values.opensearch.enabled }}
     {{- "" -}}
   {{- else }}
-    {{- required "Missing .Values.opensearchExternal.verifyCerts" .Values.opensearchExternal.verifyCerts -}}
+    {{- default "False" .Values.opensearchExternal.verifyCerts -}}
   {{- end }}
 {{- end -}}
 
@@ -448,7 +426,11 @@ Return the proper Invenio image name
   {{- if .Values.opensearch.enabled }}
     {{- "" -}}
   {{- else }}
-    {{- required "Missing .Values.opensearchExternal.caCerts" .Values.opensearchExternal.caCerts -}}
+    {{- if .Values.opensearchExternal.verifyCerts }}
+      {{- required "Missing .Values.opensearchExternal.caCerts" .Values.opensearchExternal.caCerts -}}
+    {{- else }}
+      {{- print "\"\"" }}
+    {{- end }}
   {{- end }}
 {{- end -}}
 
@@ -459,7 +441,7 @@ Return the proper Invenio image name
   {{- if .Values.opensearch.enabled }}
     {{- "" -}}
   {{- else }}
-    {{- required "Missing .Values.opensearchExternal.sslAssertHostname" .Values.opensearchExternal.sslAssertHostname -}}
+    {{- default "False" .Values.opensearchExternal.sslAssertHostname -}}
   {{- end }}
 {{- end -}}
 
@@ -470,17 +452,9 @@ Return the proper Invenio image name
   {{- if .Values.opensearch.enabled }}
     {{- "" -}}
   {{- else }}
-    {{- required "Missing .Values.opensearchExternal.sslShowWarn" .Values.opensearchExternal.sslShowWarn -}}
+    {{- default "False" .Values.opensearchExternal.sslShowWarn -}}
   {{- end }}
 {{- end -}}
-
-
-{{/*
-SEARCH_CLIENT_CONFIG={'use_ssl': False, 'verify_certs': False, 'ssl_assert_hostname': False, 'ssl_show_warn': False, 'ca_certs': None}
-INVENIO_SEARCH_HOSTS: {{ printf "[{'host': '%s'}]" (include "invenio.opensearch.hostname" .) | quote }}
-  value: {{ printf "%q" (printf "{\"use_ssl\": $(INVENIO_CONFIG_OPENSEARCH_USE_SSL), \"verify_certs\": $(INVENIO_CONFIG_OPENSEARCH_VERIFY_CERTS), \"ssl_assert_hostname\": $(INVENIO_CONFIG_OPENSEARCH_SSL_ASSERT_HOSTNAME), \"ssl_show_warn\": $(INVENIO_CONFIG_OPENSEARCH_SSL_SHOW_WARN), \"ca_certs\": \"$(INVENIO_CONFIG_OPENSEARCH_CA_CERTS)\", \"http_auth\": [\"$(INVENIO_CONFIG_OPENSEARCH_USER)\", \"$(INVENIO_CONFIG_OPENSEARCH_PASSWORD)\"]}") }}
-
-*/}}
 
 {{/*
   Opensearch connection env section.

@@ -1099,13 +1099,14 @@ opensearch:
 
 ## @param externalOpensearch External Opensearch configuration
 ## All of these values are only used when opensearch.enabled is set to false
+## @extra opensearchExternal.authEnabled if True authentification env INVENIO_SEARCH_CLIENT_CONFIG is rendered
 ## @extra opensearchExternal.hostname Database host
 ## @extra opensearchExternal.username username for Invenio
 ## @extra opensearchExternal.password Password for the non-root username for Invenio
 ## @extra opensearchExternal.existingSecret Name of an existing secret resource containing the database credentials
 ## @extra opensearchExternal.existingSecretPasswordKey Key in the existing secret that contains the database password 
-## @extra opensearchExternal.useSsl Set to True if the access protocol is https 
-## @extra opensearchExternal.verifyCerts defaults to False, if true caCerts must be provided
+## @extra opensearchExternal.useSsl (default: False) 
+## @extra opensearchExternal.verifyCerts if True caCerts must be provided (default: False)
 ## @extra opensearchExternal.sslAssertHostname (default: False)
 ## @extra opensearchExternal.sslShowWarn Show SSL warnings if enabled (default: False)
 ## @extra opensearchExternal.caCerts CA certtificate for cert verification

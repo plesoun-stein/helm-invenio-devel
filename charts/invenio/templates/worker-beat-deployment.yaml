@@ -121,7 +121,7 @@ spec:
         {{- end }}
       volumes:
       {{- if .Values.invenio.extraSecrets }}
-      {{- include "invenio.config.configFiles" . | trim | nindent 6 }}
+      {{- include "invenio.config.mountedSecrets" . | trim | nindent 6 }}
       {{- end }}
       - name: var-run-celery
         emptyDir:

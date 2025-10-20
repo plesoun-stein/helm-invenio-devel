@@ -600,7 +600,7 @@ Return the proper Invenio image name
   value: "$(INVENIO_DB_PROTOCOL)://$(INVENIO_DB_USER):$(INVENIO_DB_PASSWORD)@$(INVENIO_DB_HOST):$(INVENIO_DB_PORT)/$(INVENIO_DB_NAME)"
 {{- end -}}
 
-{{- define "invenio.config.configFiles" }}
+{{- define "invenio.config.mountedSecrets" }}
 - name: mounted-secrets 
   projected:
     sources:

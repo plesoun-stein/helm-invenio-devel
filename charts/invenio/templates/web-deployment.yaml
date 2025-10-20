@@ -281,7 +281,7 @@ spec:
       - name: nginx-invenio-assets
         emptyDir: {}
       {{- if .Values.invenio.extraSecrets }} 
-      {{- include "invenio.config.configFiles" . | trim | nindent 6 }}
+      {{- include "invenio.config.mountedSecrets" . | trim | nindent 6 }}
       {{- end }}
       {{- if .Values.persistence.enabled }}
       - name: shared-volume

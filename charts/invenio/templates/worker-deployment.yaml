@@ -124,8 +124,8 @@ spec:
               subPath: "{{ $key }}"
             {{- end }}
             {{- if .Values.invenio.extraSecrets }}
-            - name: mounted-secrets
-              mountPath: {{ default "/mounted" .Values.invenio.extraSecretsMountPath }}
+            - name: extra-secrets
+              mountPath: {{ default "/extra-secrets" .Values.invenio.extraSecretsMountPath }}
             {{- end }}
         {{- if .Values.kerberos.enabled }}
         - name: kerberos-credentials
@@ -166,7 +166,7 @@ spec:
         {{- end }}
       volumes:
         {{- if .Values.invenio.extraSecrets }}
-        {{- include "invenio.config.mountedSecrets" . | trim | nindent 8 }}
+        {{- include "invenio.config.extraSecrets" . | trim | nindent 8 }}
         {{- end }}
         {{- if .Values.persistence.enabled }}
         - name: shared-volume

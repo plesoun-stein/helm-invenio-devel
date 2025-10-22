@@ -603,8 +603,8 @@ Return the proper Invenio image name
   value: "$(INVENIO_DB_PROTOCOL)://$(INVENIO_DB_USER):$(INVENIO_DB_PASSWORD)@$(INVENIO_DB_HOST):$(INVENIO_DB_PORT)/$(INVENIO_DB_NAME)"
 {{- end -}}
 
-{{- define "invenio.config.mountedSecrets" }}
-- name: mounted-secrets 
+{{- define "invenio.config.extraSecrets" }}
+- name: extra-secrets 
   projected:
     sources:
       {{- with .Values.invenio.extraSecrets }}

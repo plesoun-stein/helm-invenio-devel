@@ -133,8 +133,8 @@ spec:
           - {{ toYaml . | nindent 12 }}
           {{- end }}
           {{- if .Values.invenio.extraSecrets }}
-          - name: mounted-secrets
-            mountPath: {{ default "/mounted" .Values.invenio.extraSecretsMountPath }}
+          - name: extra-secrets
+            mountPath: {{ default "/extra-secrets" .Values.invenio.extraSecretsMountPath }}
           {{- end }}
         securityContext:
           {{- with .Values.web.securityContext }}
@@ -161,8 +161,8 @@ spec:
           mountPath: "{{ .Values.nginx.assets.location }}"
           readOnly: true
         {{- if .Values.invenio.extraSecrets }}
-        - name: mounted-secrets
-          mountPath: {{ default "/mounted" .Values.invenio.extraSecretsMountPath }}
+        - name: extra-secrets
+          mountPath: {{ default "/extra-secrets" .Values.invenio.extraSecretsMountPath }}
         {{- end }}
         readinessProbe:
           httpGet:
@@ -281,7 +281,7 @@ spec:
       - name: nginx-invenio-assets
         emptyDir: {}
       {{- if .Values.invenio.extraSecrets }} 
-      {{- include "invenio.config.mountedSecrets" . | trim | nindent 6 }}
+      {{- include "invenio.config.extraSecrets" . | trim | nindent 6 }}
       {{- end }}
       {{- if .Values.persistence.enabled }}
       - name: shared-volume

@@ -75,8 +75,8 @@ spec:
           subPath: "{{ $key }}"
         {{- end }}
         {{- if .Values.invenio.extraSecrets }}
-        - name: mounted-secrets
-          mountPath: {{ default "/mounted" .Values.invenio.extraSecretsMountPath }}
+        - name: extra-secrets
+          mountPath: {{ default "/extra-secrets" .Values.invenio.extraSecretsMountPath }}
         {{- end }}
         envFrom:
         - configMapRef:
@@ -121,7 +121,7 @@ spec:
         {{- end }}
       volumes:
       {{- if .Values.invenio.extraSecrets }}
-      {{- include "invenio.config.mountedSecrets" . | trim | nindent 6 }}
+      {{- include "invenio.config.extraSecrets" . | trim | nindent 6 }}
       {{- end }}
       - name: var-run-celery
         emptyDir:

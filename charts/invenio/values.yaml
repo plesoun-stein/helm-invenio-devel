@@ -1114,6 +1114,7 @@ opensearch:
 ##
 opensearchExternal: {}
   # hostname: ""
+  # authEnabled: False
   # username: invenio
   # password: "" 
   # existingSecret: 

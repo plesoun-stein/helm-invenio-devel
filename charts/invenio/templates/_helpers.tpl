@@ -464,6 +464,9 @@ Return the proper Invenio image name
 - name: INVENIO_SEARCH_HOSTS
   value: {{ (include "invenio.opensearch.hostname" . | trim) }}
 {{- else }}
+{{- if and (hasKey .Values.opensearchExternal "authEnabled") (not (kindIs "bool" .Values.opensearchExternal.authEnabled)) }}
+{{- fail ".Values.opensearchExternal.authEnabled must be a boolean" }}
+{{- end }}
 - name: INVENIO_SEARCH_HOSTS
   value: {{ (include "invenio.opensearch.hostname" . | trim) }}
 {{- if .Values.opensearchExternal.authEnabled }}

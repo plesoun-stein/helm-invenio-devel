@@ -1123,7 +1123,7 @@ opensearchExternal: {}
   # verifyCerts: "False"
   # sslAssertHostname: "False"
   # sslShowWarn: "False"
-  # caCerts: "/mounted/ca.crt"
+  # caCerts: "/extra-secrets/ca.crt"
 
 ## @secion Logstash configuration
 ## TODO: review content and possibly remove

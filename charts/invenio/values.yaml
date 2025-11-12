@@ -424,7 +424,7 @@ web:
       capabilities:
         drop:
           - ALL
-  ## @param web.annotations Add extra (templated) annotations to the web service
+  ## @param web.annotations DEPRECATED: Use `.Values.web.service.annotations` instead!
   ##
   annotations: {}
   ## @param web.podLabels Add extra labels to the Invenio webs pods
@@ -444,6 +444,9 @@ web:
   ## Invenio web service parameters
   ##
   service:
+    ## @param web.service.annotations Add extra (templated) annotations to the web service
+    ##
+    annotations: {}
     ## @param web.service.type Web service type
     ##
     type: ClusterIP
@@ -909,6 +912,8 @@ redis:
     password: ""
     # existingSecret:
     # existingSecretPasswordKey:
+  image:
+    repository: bitnamilegacy/redis  # Work-around until we've migrated away from Bitnami.
   master:
     ## @param redis.master.disableCommands
     disableCommands: []  # Dangerous! This lets us run the `FLUSHALL` and `FLUSHDB` commands! Unfortunately, they are required by the wipe_recreate.sh script when installing Invenio.
@@ -941,6 +946,8 @@ rabbitmq:
   ## @param rabbitmq.auth.password
   auth:
     password: ""
+  image:
+    repository: bitnamilegacy/rabbitmq  # Work-around until we've migrated away from Bitnami.
 
 ## @param rabbitmqExternal External RabbitMQ configuration
 ## All of these values are only used when rabbitmq.enabled is set to false
@@ -1071,6 +1078,11 @@ postgresql:
     password: ""
     database: invenio
     existingSecret: ""
+  image:
+    repository: bitnamilegacy/postgresql  # Work-around until we've migrated away from Bitnami.
+  snapshots:
+    image:
+      repository: bitnamilegacy/os-shell
 
 ## @param postgresqlExternal External PostgreSQL configuration
 ## All of these values are only used when postgresql.enabled is set to false
@@ -1096,6 +1108,13 @@ postgresqlExternal: {}
 ## @param opensearch.enabled Switch to enable or disable the Opensearch helm chart
 opensearch:
   enabled: true
+  dashboards:
+    image:
+      repository: bitnamilegacy/opensearch-dashboards
+  image:
+    repository: bitnamilegacy/opensearch  # Work-around until we've migrated away from Bitnami.
+  sysctlImage:
+    repository: bitnamilegacy/os-shell  # Work-around until we've migrated away from Bitnami.
 
 ## @param externalOpensearch External Opensearch configuration
 ## All of these values are only used when opensearch.enabled is set to false
